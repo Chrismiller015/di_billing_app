@@ -37,16 +37,16 @@ model Account {
 }
 
 model Subscription {
-  id        String   @id @default(cuid())
-  accountId String
-  account   Account  @relation(fields: [accountId], references: [id])
+  id          String   @id @default(cuid())
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id])
   productCode String
-  program   Program
-  unitPrice Int
-  qty       Int
-  isLive    Boolean
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  program     Program
+  unitPrice   Int
+  qty         Int
+  isLive      Boolean
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model Pricing {
@@ -60,7 +60,7 @@ model Pricing {
 model GMInvoice {
   id        String   @id @default(cuid())
   program   Program
-  period    String // YYYY-MM
+  period    String
   fileName  String
   current   Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -72,7 +72,7 @@ model GMInvoice {
 model GMInvoiceLine {
   id          String    @id @default(cuid())
   invoiceId   String
-  invoice     GMInvoice @relation(fields: [invoiceId], references: [id])
+  invoice     GMInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   bac         String
   productCode String
   name        String
@@ -85,12 +85,14 @@ model Discrepancy {
   bac       String
   program   Program
   period    String
+  sfName    String?
   sfTotal   Int
   gmTotal   Int
   variance  Int
   status    DiscrepancyStatus @default(OPEN)
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
+  reportEntries ReportEntry[]
 }
 
 model Report {
@@ -106,10 +108,15 @@ model Report {
 }
 
 model ReportEntry {
-  id            String  @id @default(cuid())
-  reportId      String
-  report        Report  @relation(fields: [reportId], references: [id])
-  discrepancyId String
-  category      String?
-  notes         String?
+  id                  String      @id @default(cuid())
+  reportId            String
+  report              Report      @relation(fields: [reportId], references: [id])
+  discrepancyId       String
+  discrepancy         Discrepancy @relation(fields: [discrepancyId], references: [id], onDelete: Cascade)
+  category            String?
+  notes               String?
+  specificAccountName String? // New field
+  isPrimary           Boolean?  // New field
+
+  @@unique([reportId, discrepancyId])
 }
