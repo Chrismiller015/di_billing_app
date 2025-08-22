@@ -53,3 +53,49 @@ export async function uploadInvoice(
   }
   return res.json();
 }
+
+export async function fetchUploads() {
+const res = await fetch(`${API_URL}/uploads`);
+if (!res.ok) throw new Error("Failed to fetch uploads");
+return res.json();
+}
+
+export async function fetchMappings() {
+const res = await fetch(`${API_URL}/mappings`);
+if (!res.ok) throw new Error("Failed to fetch mappings");
+return res.json();
+}
+
+export async function updateMapping(productCode: string, data: any) {
+const res = await fetch(`${API_URL}/mappings/${productCode}`, {
+method: 'PATCH',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify(data)
+});
+if (!res.ok) throw new Error( (await res.json()).message || "Failed to update mapping");
+return res.json();
+}
+
+export async function createMapping(data: any) {
+const res = await fetch(`${API_URL}/mappings`, {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify(data)
+});
+if (!res.ok) throw new Error( (await res.json()).message || "Failed to create mapping");
+return res.json();
+}
+
+export async function deleteMapping(productCode: string) {
+const res = await fetch(`${API_URL}/mappings/${productCode}`, {
+method: 'DELETE',
+});
+if (!res.ok) throw new Error( (await res.json()).message || "Failed to delete mapping");
+return res.json();
+}
+
+export async function fetchReports() {
+const res = await fetch(`${API_URL}/reports`);
+if (!res.ok) throw new Error("Failed to fetch reports");
+return res.json();
+}
