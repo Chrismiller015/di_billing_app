@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { FaCloudUploadAlt, FaSpinner, FaTimes } from "react-icons/fa";
-import { uploadInvoice } from "./api";
+import { uploadInvoice } from "../api";
 
 export function UploadModal({ onClose }: { onClose: () => void }) {
   const [file, setFile] = useState<File | null>(null);
