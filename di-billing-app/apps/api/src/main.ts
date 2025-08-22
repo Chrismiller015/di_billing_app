@@ -10,6 +10,6 @@ logger: ["log", "error", "warn", "debug", "verbose"],
 app.enableCors();
 const port = process.env.PORT || 4000;
 await app.listen(port);
-Logger.log(API listening on http://localhost:${port});
+Logger.log(`API listening on http://localhost:${port}`);
 }
 bootstrap();

@@ -2,8 +2,8 @@
   "name": "di-billing-app",
   "private": true,
   "workspaces": [
-    "apps/",
-    "packages/"
+    "apps/*",
+    "packages/*"
   ],
   "scripts": {
     "dev:api": "npm --workspace @di/api run start:dev",
