@@ -26,7 +26,7 @@ export class ReportsController {
 
   @Post(':id/entries')
   addEntries(@Param('id') id: string, @Body() addEntriesDto: AddEntriesDto) {
-    return this.svc.addEntries(id, addEntriesDto.discrepancyIds);
+    return this.svc.addEntries(id, addEntriesDto.entries);
   }
 
   @Get(':id/export')

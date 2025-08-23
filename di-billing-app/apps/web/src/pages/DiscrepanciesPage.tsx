@@ -101,7 +101,7 @@ const ReportDetailsPane = ({ program, period, isOpen, setIsOpen }) => {
                                             {editingEntry?.id === entry.id ? (
                                                 <>
                                                     <td className="px-3 py-1 font-mono text-xs">{entry.discrepancy.bac}</td>
-                                                    <td className="px-3 py-1 text-xs">{entry.discrepancy.sfName}</td>
+                                                    <td className="px-3 py-1 text-xs">{entry.specificAccountName || entry.discrepancy.sfName}</td>
                                                     <td className="px-3 py-1 text-right font-mono text-xs" style={{color: entry.discrepancy.variance > 0 ? '#fca5a5' : '#86efac'}}>{entry.discrepancy.variance > 0 ? "+" : ""}{dollar(entry.discrepancy.variance)}</td>
                                                     <td className="px-3 py-1"><input value={editingEntry.category || ''} onChange={e => setEditingEntry({...editingEntry, category: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1" /></td>
                                                     <td className="px-3 py-1"><input value={editingEntry.notes || ''} onChange={e => setEditingEntry({...editingEntry, notes: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1" /></td>
@@ -110,7 +110,7 @@ const ReportDetailsPane = ({ program, period, isOpen, setIsOpen }) => {
                                             ) : (
                                                 <>
                                                     <td className="px-3 py-2 font-mono text-xs">{entry.discrepancy.bac}</td>
-                                                    <td className="px-3 py-2 text-xs">{entry.discrepancy.sfName}</td>
+                                                    <td className="px-3 py-2 text-xs">{entry.specificAccountName || entry.discrepancy.sfName}</td>
                                                     <td className="px-3 py-2 text-right font-mono text-xs" style={{color: entry.discrepancy.variance > 0 ? '#fca5a5' : '#86efac'}}>{entry.discrepancy.variance > 0 ? "+" : ""}{dollar(entry.discrepancy.variance)}</td>
                                                     <td className="px-3 py-2">{entry.category || '-'}</td>
                                                     <td className="px-3 py-2">{entry.notes || '-'}</td>
@@ -256,8 +256,12 @@ export function DiscrepanciesPage() {
                     title="Add to Report" 
                     icon={FaFileCsv} 
                     onClick={() => {
-                        setSelected([drawerRow.id]);
-                        setReportModalOpen(true);
+                        const discrepancies = discrepanciesQuery.data?.rows || [];
+                        const discrepancyToAdd = discrepancies.find(d => d.id === drawerRow.id);
+                        if (discrepancyToAdd) {
+                           setSelected([drawerRow.id]);
+                           setReportModalOpen(true);
+                        }
                     }}
                 />
                 <button onClick={() => setDrawerRow(null)} className="p-2 rounded-lg hover:bg-slate-800/60"><FaTimes /></button>

@@ -14,10 +14,14 @@ const AccountSelector = ({ bac, sfName, onAccountSelect }) => {
 
     return (
         <select onChange={(e) => {
+            if (!e.target.value) {
+                onAccountSelect(null);
+                return;
+            }
             const [name, isPrimary] = e.target.value.split('|');
             onAccountSelect({ name, isPrimary: isPrimary === 'true' });
         }} className="w-full h-10 bg-slate-800 border border-slate-700 rounded-lg px-2 text-sm">
-            <option>Select an account...</option>
+            <option value="">Select an account...</option>
             {accountsQuery.data?.map(acc => (
                 <option key={acc.name} value={`${acc.name}|${acc.isPrimary}`}>{acc.name}</option>
             ))}
@@ -37,6 +41,16 @@ export const AddToReportModal = ({ onClose, discrepancies, program, period }) =>
 
   const reportsQuery = useQuery({ queryKey: ['reports'], queryFn: fetchReports });
 
+  // New useEffect to auto-select the latest report for the current context
+  useEffect(() => {
+    if (reportsQuery.data) {
+        const matchingReport = reportsQuery.data.find(r => r.program === program && r.period === period);
+        if (matchingReport) {
+            setSelectedReportId(matchingReport.id);
+        }
+    }
+  }, [reportsQuery.data, program, period]);
+
   const createReportMutation = useMutation({
     mutationFn: (name: string) => createReport({ name, program, period }),
     onSuccess: (newReport) => {
@@ -51,6 +65,8 @@ export const AddToReportModal = ({ onClose, discrepancies, program, period }) =>
     mutationFn: (entries: any[]) => addDiscrepanciesToReport(selectedReportId, entries),
     onSuccess: () => {
       toast.success(`${discrepancies.length} items added to report.`);
+      // Invalidate the query for the report pane so it refreshes
+      queryClient.invalidateQueries({ queryKey: ['report', program, period] });
       onClose();
     },
     onError: (err: Error) => toast.error(err.message),
