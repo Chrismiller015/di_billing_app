@@ -1,3 +1,4 @@
+// [SOURCE: apps/api/src/uploads/uploads.service.ts]
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import * as XLSX from "xlsx";
@@ -129,32 +130,59 @@ export class UploadsService {
   async handleAccountsUpload(filePath: string) {
     this.logger.log(`Parsing accounts from ${filePath}`);
     const fileContent = fs.readFileSync(filePath);
-    const accountsToCreate = [];
+    const tempAccounts = [];
+    const bacCounts = new Map<string, number>();
     let errorCount = 0;
+    
     const parser = parse(fileContent, {
       columns: true,
       skip_empty_lines: true,
     });
+
+    // First pass: Read all data and count BAC occurrences
     for await (const record of parser) {
       if (!record.Account_ID__c || !record.Name || !record.BAC_Code__c) {
         errorCount++;
         continue;
       }
-      accountsToCreate.push({
+      const bac = normalizeBac(record.BAC_Code__c);
+      bacCounts.set(bac, (bacCounts.get(bac) || 0) + 1);
+      tempAccounts.push(record);
+    }
+    
+    // Second pass: Process and apply isPrimary logic
+    const accountsToCreate = tempAccounts.map(record => {
+      const bac = normalizeBac(record.BAC_Code__c);
+      const isCadillac = record.OEM__c?.includes('Cadillac') || false;
+      const bacCount = bacCounts.get(bac) || 1;
+      let isPrimary = true; // Default to true
+
+      if (bacCount > 1) {
+        if (isCadillac) {
+          isPrimary = false;
+        } else {
+          isPrimary = true;
+        }
+      }
+      
+      return {
         sfid: record.Account_ID__c,
         name: record.Name,
-        bac: normalizeBac(record.BAC_Code__c),
-        isPrimary: record.isPrimary?.toLowerCase() === 'true' || true,
+        bac: bac,
+        isPrimary: isPrimary,
         isChevy: record.OEM__c?.includes('Chevrolet') || false,
         isGmc: record.OEM__c?.includes('GMC') || false,
         isBuick: record.OEM__c?.includes('Buick') || false,
-        isCadillac: record.OEM__c?.includes('Cadillac') || false,
-      });
-    }
+        isCadillac: isCadillac,
+      };
+    });
+
     if (accountsToCreate.length > 0) {
+      await this.db.subscription.deleteMany({});
       await this.db.account.deleteMany({});
       await this.db.account.createMany({ data: accountsToCreate });
     }
+
     fs.unlinkSync(filePath);
     this.logger.log(`Finished processing accounts. Created: ${accountsToCreate.length}, Skipped: ${errorCount}`);
     return { created: accountsToCreate.length, skipped: errorCount };

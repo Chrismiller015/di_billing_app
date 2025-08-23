@@ -1,3 +1,4 @@
+// [SOURCE: apps/api/src/discrepancies/dto/list-discrepancies.dto.ts]
 import { IsString, IsOptional, IsInt, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -17,6 +18,16 @@ export class ListDiscrepanciesQueryDto {
   @IsOptional()
   @IsString()
   bac?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  minVariance?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  maxVariance?: number;
 
   @IsOptional()
   @Type(() => Number)

@@ -1,3 +1,4 @@
+// [SOURCE: apps/api/src/discrepancies/discrepancies.service.ts]
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { Program } from "@prisma/client";
@@ -22,6 +23,19 @@ export class DiscrepanciesService {
     const [rows, total] = await this.db.$transaction([
       this.db.discrepancy.findMany({
         where,
+        select: {
+            id: true,
+            bac: true,
+            sfName: true,
+            accountCount: true,
+            program: true,
+            period: true,
+            sfTotal: true,
+            gmTotal: true,
+            variance: true,
+            status: true,
+            updatedAt: true,
+        },
         orderBy,
         skip: (page - 1) * pageSize,
         take: pageSize,
@@ -43,29 +57,28 @@ export class DiscrepanciesService {
     const accountIds = sfAgg.map((a) => a.accountId);
     const accounts = await this.db.account.findMany({
       where: { id: { in: accountIds } },
-      select: { id: true, bac: true, name: true },
+      select: { id: true, sfid: true, bac: true, name: true, isPrimary: true },
     });
     
-    const bacToNames = new Map<string, string[]>();
+    const bacToAccounts = new Map<string, {sfid: string, name: string, isPrimary: boolean}[]>();
     for (const acc of accounts) {
-        if (!bacToNames.has(acc.bac)) {
-            bacToNames.set(acc.bac, []);
+        if (!bacToAccounts.has(acc.bac)) {
+            bacToAccounts.set(acc.bac, []);
         }
-        bacToNames.get(acc.bac)!.push(acc.name);
+        bacToAccounts.get(acc.bac)!.push({ sfid: acc.sfid, name: acc.name, isPrimary: acc.isPrimary });
     }
 
-    const sfByBac = new Map<string, { total: number; name: string }>();
+    const sfByBac = new Map<string, { total: number; accounts: {sfid: string, name: string, isPrimary: boolean}[] }>();
     for (const a of sfAgg) {
       const acc = accounts.find((x) => x.id === a.accountId);
       if (!acc) continue;
       
-      const names = bacToNames.get(acc.bac) || [];
-      const uniqueNames = Array.from(new Set(names)).join(', ');
-
-      const current = sfByBac.get(acc.bac) || { total: 0, name: uniqueNames };
+      const accs = bacToAccounts.get(acc.bac) || [];
+      
+      const current = sfByBac.get(acc.bac) || { total: 0, accounts: accs };
       sfByBac.set(acc.bac, {
         total: current.total + (a._sum.unitPrice || 0),
-        name: uniqueNames,
+        accounts: accs,
       });
     }
 
@@ -93,7 +106,7 @@ export class DiscrepanciesService {
     const allBacs = new Set<string>([...sfByBac.keys(), ...gmByBac.keys()]);
     const rows = [];
     for (const bac of allBacs) {
-      const sfData = sfByBac.get(bac) || { total: 0, name: null };
+      const sfData = sfByBac.get(bac) || { total: 0, accounts: [] };
       const gmTotal = gmByBac.get(bac) || 0;
       const variance = sfData.total - gmTotal;
       if (Math.abs(variance) > 0.01) {
@@ -101,7 +114,8 @@ export class DiscrepanciesService {
           bac,
           program: program as Program,
           period,
-          sfName: sfData.name,
+          sfName: sfData.accounts.map(a => a.name).join(', '),
+          accountCount: sfData.accounts.length,
           sfTotal: sfData.total,
           gmTotal,
           variance,
@@ -119,7 +133,7 @@ export class DiscrepanciesService {
   async getAccountsByBac(bac: string) {
     return this.db.account.findMany({
       where: { bac },
-      select: { name: true, isPrimary: true },
+      select: { sfid: true, name: true, isPrimary: true },
     });
   }
 
@@ -155,4 +169,3 @@ export class DiscrepanciesService {
     return { sfLines, gmLines };
   }
 }
-// --- END OF FILE ---
