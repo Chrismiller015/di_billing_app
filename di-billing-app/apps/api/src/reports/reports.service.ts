@@ -1,3 +1,4 @@
+// [SOURCE: apps/api/src/reports/reports.service.ts]
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateReportDto } from "./dto/create-report.dto";
@@ -44,15 +45,15 @@ export class ReportsService {
   }
 
   async addEntries(reportId: string, entries: any[]) {
+    // --- CHANGE START ---
     const data = entries.map(entry => ({
       reportId,
       discrepancyId: entry.discrepancyId,
       specificAccountName: entry.specificAccountName,
+      specificSalesforceId: entry.specificSalesforceId, // Added new field
       isPrimary: entry.isPrimary,
     }));
-    // Using upsert to handle cases where an entry for a discrepancy might already exist
-    // This is more complex with createMany, so we do it one by one.
-    // For simplicity, we'll just create, assuming duplicates won't be re-added often.
+    // --- CHANGE END ---
     return this.db.reportEntry.createMany({
       data,
       skipDuplicates: true,
@@ -75,9 +76,11 @@ export class ReportsService {
       throw new NotFoundException(`Report with ID "${reportId}" not found`);
     }
 
+    // --- CHANGE START ---
     const dataToExport = report.entries.map(entry => ({
       'BAC': entry.discrepancy.bac,
       'SF_Name': entry.specificAccountName || entry.discrepancy.sfName,
+      'SFID': entry.specificSalesforceId, // Added new column
       'isPrimary': entry.isPrimary ?? 'N/A',
       'SF_Total': entry.discrepancy.sfTotal,
       'GM_Total': entry.discrepancy.gmTotal,
@@ -88,6 +91,7 @@ export class ReportsService {
       'Period': entry.discrepancy.period,
       'Program': entry.discrepancy.program,
     }));
+    // --- CHANGE END ---
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
@@ -99,4 +103,3 @@ export class ReportsService {
     return { buffer, fileName };
   }
 }
-// --- END OF FILE ---

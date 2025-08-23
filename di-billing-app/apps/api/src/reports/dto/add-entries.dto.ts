@@ -1,5 +1,6 @@
+// [SOURCE: apps/api/src/reports/dto/add-entries.dto.ts]
 import { Type } from 'class-transformer';
-import { IsArray, IsNotEmpty, IsObject, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsNotEmpty, IsOptional, IsString, ValidateNested } from 'class-validator';
 
 class ReportEntryInput {
     @IsString()
@@ -10,7 +11,14 @@ class ReportEntryInput {
     @IsString()
     specificAccountName?: string;
     
+    // --- CHANGE START ---
     @IsOptional()
+    @IsString()
+    specificSalesforceId?: string;
+    // --- CHANGE END ---
+
+    @IsOptional()
+    @IsBoolean()
     isPrimary?: boolean;
 }
 

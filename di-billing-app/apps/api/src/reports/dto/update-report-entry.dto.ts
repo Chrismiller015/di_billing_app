@@ -1,4 +1,5 @@
-import { IsString, IsOptional } from 'class-validator';
+// [SOURCE: apps/api/src/reports/dto/update-report-entry.dto.ts]
+import { IsString, IsOptional, IsBoolean } from 'class-validator';
 
 export class UpdateReportEntryDto {
   @IsOptional()
@@ -8,5 +9,18 @@ export class UpdateReportEntryDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  // --- CHANGE START ---
+  @IsOptional()
+  @IsString()
+  specificAccountName?: string;
+
+  @IsOptional()
+  @IsString()
+  specificSalesforceId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isPrimary?: boolean;
+  // --- CHANGE END ---
 }
-// --- END OF FILE ---

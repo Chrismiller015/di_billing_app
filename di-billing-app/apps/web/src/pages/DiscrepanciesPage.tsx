@@ -2,14 +2,18 @@ import React, { useState, useRef, useCallback, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import { FaChevronRight, FaFileCsv, FaFilter, FaSearch, FaSpinner, FaTimes, FaSync, FaSort, FaSortUp, FaSortDown, FaChevronLeft, FaChevronUp, FaChevronDown, FaEdit, FaTrash, FaSave } from "react-icons/fa";
-import { fetchDiscrepancies, recalculateDiscrepancies, fetchReportByPeriod, updateReportEntry, deleteReportEntry } from "../api";
+import { FaFileCsv, FaFilter, FaSearch, FaSpinner, FaSync, FaTimes } from "react-icons/fa";
+import { fetchDiscrepancies, recalculateDiscrepancies } from "../api";
 import { AppContextType } from "../App";
 import { LinesPanel } from "../components/LinesPanel";
 import { AddToReportModal } from "../components/AddToReportModal";
-
-const cls = (...xs: (string | false | undefined)[]) => xs.filter(Boolean).join(" ");
-const dollar = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+import { DiscrepanciesTable } from "../components/DiscrepanciesTable";
+import { PaginationControls } from "../components/PaginationControls";
+import { ReportDetailsPane } from "../components/ReportDetailsPane";
+import { TabButton } from "../components/ui/TabButton";
+import { IconBtn } from "../components/ui/IconBtn";
+import { Badge } from "../components/ui/Badge";
+import { dollar } from '../utils';
 
 type Row = {
   id: string;
@@ -26,109 +30,6 @@ type Row = {
 };
 
 type SortConfig = { key: string; direction: 'asc' | 'desc' };
-
-const ReportDetailsPane = ({ program, period, isOpen, setIsOpen }) => {
-    const queryClient = useQueryClient();
-    const [editingEntry, setEditingEntry] = useState<any>(null);
-
-    const reportQuery = useQuery({
-        queryKey: ['report', program, period],
-        queryFn: () => fetchReportByPeriod(program, period),
-        enabled: isOpen,
-    });
-
-    const updateEntryMutation = useMutation({
-        mutationFn: (entry: any) => updateReportEntry(entry.id, { category: entry.category, notes: entry.notes }),
-        onSuccess: () => {
-            toast.success("Entry updated!");
-            queryClient.invalidateQueries({ queryKey: ['report', program, period] });
-            setEditingEntry(null);
-        },
-        onError: (err: Error) => toast.error(err.message),
-    });
-
-    const deleteEntryMutation = useMutation({
-        mutationFn: (entryId: string) => deleteReportEntry(entryId),
-        onSuccess: () => {
-            toast.success("Entry removed from report!");
-            queryClient.invalidateQueries({ queryKey: ['report', program, period] });
-        },
-        onError: (err: Error) => toast.error(err.message),
-    });
-
-    const handleEdit = (entry: any) => {
-        setEditingEntry({ ...entry });
-    };
-
-    const handleSave = () => {
-        updateEntryMutation.mutate(editingEntry);
-    };
-    
-    const handleDelete = (entryId: string) => {
-        if(window.confirm("Remove this item from the report?")) {
-            deleteEntryMutation.mutate(entryId);
-        }
-    };
-
-    return (
-        <div className={`fixed bottom-0 left-0 right-0 bg-[#10171B] border-t border-slate-700 shadow-2xl transition-transform duration-300 ease-in-out ${isOpen ? 'translate-y-0' : 'translate-y-full'}`} style={{ height: '50vh', marginLeft: '16rem' /* Adjust if sidebar width changes */ }}>
-            <button onClick={() => setIsOpen(!isOpen)} className="absolute -top-8 right-10 px-4 py-1 bg-[#10171B] border-t border-l border-r border-slate-700 rounded-t-lg flex items-center gap-2">
-                {isOpen ? <FaChevronDown/> : <FaChevronUp/>}
-                <span>View Report</span>
-            </button>
-            <div className="p-4 h-full overflow-auto">
-                {reportQuery.isLoading && <div className="flex justify-center items-center h-full"><FaSpinner className="animate-spin mr-2"/> Loading Report...</div>}
-                {reportQuery.isError && <div className="text-center text-rose-400">Error: {reportQuery.error.message}</div>}
-                {reportQuery.data && (
-                    <>
-                        <h2 className="text-xl font-semibold">{reportQuery.data.name}</h2>
-                        <p className="text-sm text-slate-400 mb-4">{reportQuery.data.entries.length} items</p>
-                        <div className="rounded-xl border border-slate-800 overflow-hidden bg-[#0E1417]">
-                            <table className="w-full text-sm">
-                                <thead className="bg-slate-900/60 text-slate-300">
-                                    <tr className="text-left">
-                                        <th className="px-3 py-2 font-medium">BAC</th>
-                                        <th className="px-3 py-2 font-medium">SF Name</th>
-                                        <th className="px-3 py-2 font-medium text-right">Variance</th>
-                                        <th className="px-3 py-2 font-medium">Category</th>
-                                        <th className="px-3 py-2 font-medium">Notes</th>
-                                        <th className="px-3 py-2 font-medium">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {reportQuery.data.entries.map(entry => (
-                                        <tr key={entry.id} className="border-t border-slate-800">
-                                            {editingEntry?.id === entry.id ? (
-                                                <>
-                                                    <td className="px-3 py-1 font-mono text-xs">{entry.discrepancy.bac}</td>
-                                                    <td className="px-3 py-1 text-xs">{entry.specificAccountName || entry.discrepancy.sfName}</td>
-                                                    <td className="px-3 py-1 text-right font-mono text-xs" style={{color: entry.discrepancy.variance > 0 ? '#fca5a5' : '#86efac'}}>{entry.discrepancy.variance > 0 ? "+" : ""}{dollar(entry.discrepancy.variance)}</td>
-                                                    <td className="px-3 py-1"><input value={editingEntry.category || ''} onChange={e => setEditingEntry({...editingEntry, category: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1" /></td>
-                                                    <td className="px-3 py-1"><input value={editingEntry.notes || ''} onChange={e => setEditingEntry({...editingEntry, notes: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1" /></td>
-                                                    <td className="px-3 py-1"><div className="flex gap-2"><button onClick={handleSave} className="p-2 text-emerald-400 hover:bg-slate-700 rounded"><FaSave/></button><button onClick={() => setEditingEntry(null)} className="p-2 text-slate-400 hover:bg-slate-700 rounded"><FaTimes/></button></div></td>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <td className="px-3 py-2 font-mono text-xs">{entry.discrepancy.bac}</td>
-                                                    <td className="px-3 py-2 text-xs">{entry.specificAccountName || entry.discrepancy.sfName}</td>
-                                                    <td className="px-3 py-2 text-right font-mono text-xs" style={{color: entry.discrepancy.variance > 0 ? '#fca5a5' : '#86efac'}}>{entry.discrepancy.variance > 0 ? "+" : ""}{dollar(entry.discrepancy.variance)}</td>
-                                                    <td className="px-3 py-2">{entry.category || '-'}</td>
-                                                    <td className="px-3 py-2">{entry.notes || '-'}</td>
-                                                    <td className="px-3 py-2"><div className="flex gap-2"><button onClick={() => handleEdit(entry)} className="p-2 text-cyan-400 hover:bg-slate-700 rounded"><FaEdit/></button><button onClick={() => handleDelete(entry.id)} className="p-2 text-rose-400 hover:bg-slate-700 rounded"><FaTrash/></button></div></td>
-                                                </>
-                                            )}
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </>
-                )}
-                {!reportQuery.data && !reportQuery.isLoading && <div className="flex justify-center items-center h-full text-slate-500">No report found for this period.</div>}
-            </div>
-        </div>
-    );
-};
 
 export function DiscrepanciesPage() {
   const { program, period } = useOutletContext<AppContextType>();
@@ -171,17 +72,20 @@ export function DiscrepanciesPage() {
       setDrawerWidth(newWidth);
     }
   }, []);
+
   const handleMouseUp = useCallback(() => {
     isResizing.current = false;
     window.removeEventListener("mousemove", handleMouseMove);
     window.removeEventListener("mouseup", handleMouseUp);
   }, [handleMouseMove]);
+
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     isResizing.current = true;
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", handleMouseUp);
   }, [handleMouseMove, handleMouseUp]);
+
   useEffect(() => {
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
@@ -221,7 +125,7 @@ export function DiscrepanciesPage() {
             <div className="text-center text-rose-400">Error: {discrepanciesQuery.error.message}</div>
           ) : (
             <>
-              <Table
+              <DiscrepanciesTable
                 rows={discrepanciesQuery.data?.rows || []}
                 selected={selected}
                 setSelected={setSelected}
@@ -294,166 +198,5 @@ export function DiscrepanciesPage() {
       />
     </div>
   );
-}
-
-function TabButton({ children, active, onClick }: { children: React.ReactNode, active: boolean, onClick: () => void }) {
-  return <button onClick={onClick} className={cls("px-4 h-10 rounded-t-lg border-b-2", active ? "border-cyan-400 text-cyan-300" : "border-transparent text-slate-400 hover:text-slate-200")}>{children}</button>
-}
-
-function IconBtn({ title, icon: Icon, onClick, disabled }: { title: string, icon: React.ComponentType<any>, onClick?: () => void, disabled?: boolean }) {
-  return <button title={title} onClick={onClick} disabled={disabled} className="inline-flex items-center gap-2 px-3 h-9 rounded-xl border border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700/70 transition disabled:opacity-50 disabled:cursor-not-allowed">
-    {disabled ? <FaSpinner className="animate-spin" /> : <Icon />}
-    <span className="text-sm">{title}</span>
-  </button>
-}
-
-const Th = ({ children, className = '' }: { children: React.ReactNode, className?: string }) => (
-    <th className={`px-3 py-2 font-medium ${className}`}>{children}</th>
-);
-
-const SortableTh = ({ children, sortKey, sortConfig, setSortConfig, className = '' }) => {
-    const isSorted = sortConfig.key === sortKey;
-    const direction = isSorted ? sortConfig.direction : null;
-
-    const handleClick = () => {
-        let newDirection: 'asc' | 'desc' = 'desc';
-        if(isSorted && direction === 'desc') {
-            newDirection = 'asc';
-        }
-        setSortConfig({ key: sortKey, direction: newDirection });
-    };
-
-    return (
-        <th className={`px-3 py-2 font-medium cursor-pointer hover:bg-slate-800 ${className}`} onClick={handleClick}>
-            <div className={`flex items-center gap-2 ${className.includes('text-right') ? 'justify-end' : 'justify-start'}`}>
-                <span>{children}</span>
-                {direction === 'asc' ? <FaSortUp/> : direction === 'desc' ? <FaSortDown/> : <FaSort className="opacity-30"/>}
-            </div>
-        </th>
-    );
-};
-
-function Table({ rows, selected, setSelected, onOpen, sortConfig, setSortConfig }) {
-  const headerCheckboxRef = useRef<HTMLInputElement>(null);
-  const [lastCheckedIndex, setLastCheckedIndex] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (headerCheckboxRef.current) {
-      const numSelected = selected.length;
-      const numRows = rows.length;
-      headerCheckboxRef.current.checked = numSelected === numRows && numRows > 0;
-      headerCheckboxRef.current.indeterminate = numSelected > 0 && numSelected < numRows;
-    }
-  }, [selected, rows]);
-
-  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked) {
-      setSelected(rows.map(r => r.id));
-    } else {
-      setSelected([]);
-    }
-  };
-
-  const handleRowCheckboxChange = (e: React.MouseEvent, id: string, index: number) => {
-    e.stopPropagation();
-
-    if (e.nativeEvent.shiftKey && lastCheckedIndex !== null) {
-        const start = Math.min(lastCheckedIndex, index);
-        const end = Math.max(lastCheckedIndex, index);
-        const rangeIds = rows.slice(start, end + 1).map(r => r.id);
-        
-        const currentSelected = new Set(selected);
-        const rowIsSelected = currentSelected.has(id);
-
-        if (rowIsSelected) {
-            rangeIds.forEach(rid => currentSelected.delete(rid));
-        } else {
-            rangeIds.forEach(rid => currentSelected.add(rid));
-        }
-        setSelected(Array.from(currentSelected));
-
-    } else {
-        setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-    }
-    setLastCheckedIndex(index);
-  };
-
-  return (
-    <div className="rounded-xl border border-slate-800 overflow-hidden bg-[#0E1417]">
-      <table className="w-full text-sm">
-        <thead className="bg-slate-900/60 text-slate-300">
-          <tr className="text-left">
-            <Th><input type="checkbox" ref={headerCheckboxRef} onChange={handleSelectAll} /></Th>
-            <SortableTh sortKey="bac" {...{sortConfig, setSortConfig}}>BAC</SortableTh>
-            <SortableTh sortKey="sfName" {...{sortConfig, setSortConfig}}>Salesforce Name</SortableTh>
-            <SortableTh sortKey="sfTotal" {...{sortConfig, setSortConfig}} className="text-right">SF Total $</SortableTh>
-            <SortableTh sortKey="gmTotal" {...{sortConfig, setSortConfig}} className="text-right">GM Total $</SortableTh>
-            <SortableTh sortKey="variance" {...{sortConfig, setSortConfig}} className="text-right">Variance $</SortableTh>
-            <SortableTh sortKey="status" {...{sortConfig, setSortConfig}}>Status</SortableTh>
-            <SortableTh sortKey="updatedAt" {...{sortConfig, setSortConfig}}>Last Updated</SortableTh>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, index) => (
-            <tr key={r.id} className="border-t border-slate-800 hover:bg-slate-800/40 cursor-pointer" onClick={() => onOpen(r)}>
-              <td className="px-3 py-2"><input type="checkbox" checked={selected.includes(r.id)} onClick={(e) => handleRowCheckboxChange(e, r.id, index)} onChange={()=>{}} /></td>
-              <td className="px-3 py-2 font-mono text-xs">{r.bac}</td>
-              <td className="px-3 py-2">{r.sfName || "N/A"}</td>
-              <td className="px-3 py-2 text-right">{dollar(r.sfTotal)}</td>
-              <td className="px-3 py-2 text-right">{dollar(r.gmTotal)}</td>
-              <td className="px-3 py-2 text-right" style={{color: r.variance > 0 ? '#fca5a5' : '#86efac'}}>{r.variance > 0 ? "+" : ""}{dollar(r.variance)}</td>
-              <td className="px-3 py-2"><Badge color={r.status === "OPEN" ? "red" : r.status === "IN_REVIEW" ? "yellow" : "green"}>{r.status}</Badge></td>
-              <td className="px-3 py-2 text-slate-400">{new Date(r.updatedAt).toLocaleString()}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {rows.length === 0 && <div className="p-10 text-center text-slate-400"><p className="mb-3">No discrepancies found for this filter.</p></div>}
-    </div>
-  );
-}
-
-function PaginationControls({ page, pageSize, total, setPage }) {
-    const totalPages = Math.ceil(total / pageSize);
-    const startItem = total === 0 ? 0 : (page - 1) * pageSize + 1;
-    const endItem = Math.min(page * pageSize, total);
-
-    return (
-        <div className="flex items-center justify-between mt-4 text-sm text-slate-400">
-            <div>
-                Showing <span className="font-medium text-slate-200">{startItem}</span> - <span className="font-medium text-slate-200">{endItem}</span> of <span className="font-medium text-slate-200">{total}</span>
-            </div>
-            <div className="flex items-center gap-2">
-                <button
-                    onClick={() => setPage(page - 1)}
-                    disabled={page <= 1}
-                    className="inline-flex items-center gap-2 px-3 h-9 rounded-xl border border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700/70 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    <FaChevronLeft />
-                    <span>Previous</span>
-                </button>
-                <button
-                    onClick={() => setPage(page + 1)}
-                    disabled={page >= totalPages}
-                    className="inline-flex items-center gap-2 px-3 h-9 rounded-xl border border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700/70 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    <span>Next</span>
-                    <FaChevronRight />
-                </button>
-            </div>
-        </div>
-    )
-}
-
-function Badge({ children, color = "slate" }: { children: React.ReactNode, color?: "slate" | "green" | "red" | "yellow" | "blue" | "purple" }) {
-  const map = {
-    slate: "bg-slate-800 text-slate-200 border-slate-700",
-    green: "bg-emerald-900/50 text-emerald-300 border-emerald-800",
-    red: "bg-rose-900/50 text-rose-300 border-rose-800",
-    yellow: "bg-amber-900/50 text-amber-300 border-amber-800",
-    blue: "bg-cyan-900/50 text-cyan-300 border-cyan-800",
-    purple: "bg-violet-900/50 text-violet-300 border-violet-800",
-  } as const;
-  return <span className={cls("px-2 py-1 rounded-full text-xs border", map[color])}>{children}</span>
 }
 // --- END OF FILE ---

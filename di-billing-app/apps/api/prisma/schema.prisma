@@ -115,8 +115,9 @@ model ReportEntry {
   discrepancy         Discrepancy @relation(fields: [discrepancyId], references: [id], onDelete: Cascade)
   category            String?
   notes               String?
-  specificAccountName String? // New field
-  isPrimary           Boolean?  // New field
+  specificAccountName String? 
+  specificSalesforceId String?
+  isPrimary           Boolean?  
 
   @@unique([reportId, discrepancyId])
 }

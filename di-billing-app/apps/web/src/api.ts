@@ -1,3 +1,4 @@
+// [SOURCE: apps/web/src/api.ts]
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
 
 // =========== Discrepancy Functions ===========
@@ -235,7 +236,7 @@ export async function downloadReport(reportId: string, reportName: string) {
   window.URL.revokeObjectURL(url);
 }
 
-export async function updateReportEntry(id: string, data: { category?: string; notes?: string }) {
+export async function updateReportEntry(id: string, data: { category?: string; notes?: string; specificAccountName?: string; specificSalesforceId?: string; isPrimary?: boolean; }) {
   const res = await fetch(`${API_URL}/reports/entries/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -252,4 +253,3 @@ export async function deleteReportEntry(id: string) {
   if (!res.ok) throw new Error((await res.json()).message || "Failed to delete report entry");
   return res.json();
 }
-// --- END OF FILE ---
