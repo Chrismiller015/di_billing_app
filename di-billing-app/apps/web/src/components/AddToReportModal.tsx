@@ -1,11 +1,10 @@
-// [SOURCE: apps/web/src/components/AddToReportModal.tsx]
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { FaTimes, FaSpinner } from 'react-icons/fa';
 import { fetchReports, createReport, addDiscrepanciesToReport, fetchAccountsByBac } from '../api';
 
-const AccountSelector = ({ bac, sfName, onAccountSelect }) => {
+const AccountSelector = ({ bac, onAccountSelect }) => {
     const accountsQuery = useQuery({
         queryKey: ['accountsByBac', bac],
         queryFn: () => fetchAccountsByBac(bac)
@@ -84,28 +83,39 @@ export const AddToReportModal = ({ onClose, discrepancies, program, period }) =>
   };
 
   const handleSubmit = async () => {
-    const entriesPromises = discrepancies.map(async (d) => {
-      if (d.accountCount > 1) {
-        const selection = accountSelections[d.id];
+    const entriesPromise = discrepancies.map(async (d) => {
+        let accountDetails = { name: d.sfName, sfid: null, isPrimary: null };
+        if (d.accountCount > 1) {
+            const selection = accountSelections[d.id];
+            if (selection) {
+                accountDetails = { ...selection };
+            }
+        } else {
+            // This is the fix: fetch account details for single-account BACs
+            try {
+                const accounts = await fetchAccountsByBac(d.bac);
+                if (accounts && accounts.length > 0) {
+                    const account = accounts[0];
+                    accountDetails = {
+                        name: account.name,
+                        sfid: account.sfid,
+                        isPrimary: account.isPrimary,
+                    };
+                }
+            } catch (err) {
+                console.error("Failed to fetch account for single BAC", err);
+            }
+        }
+
         return {
-          discrepancyId: d.id,
-          specificAccountName: selection?.name,
-          specificSalesforceId: selection?.sfid,
-          isPrimary: selection?.isPrimary,
+            discrepancyId: d.id,
+            specificAccountName: accountDetails.name,
+            specificSalesforceId: accountDetails.sfid,
+            isPrimary: accountDetails.isPrimary,
         };
-      } else {
-        const accounts = await fetchAccountsByBac(d.bac);
-        const account = accounts[0];
-        return {
-          discrepancyId: d.id,
-          specificAccountName: account?.name,
-          specificSalesforceId: account?.sfid,
-          isPrimary: account?.isPrimary,
-        };
-      }
     });
-  
-    const entries = await Promise.all(entriesPromises);
+
+    const entries = await Promise.all(entriesPromise);
     addEntriesMutation.mutate(entries);
   };
   
@@ -151,7 +161,7 @@ export const AddToReportModal = ({ onClose, discrepancies, program, period }) =>
                     {multiAccountDiscrepancies.map(d => (
                         <div key={d.id}>
                             <label className="block text-sm font-medium text-slate-300">BAC {d.bac} - {d.sfName}</label>
-                            <AccountSelector bac={d.bac} sfName={d.sfName} onAccountSelect={(selection) => handleAccountSelect(d.id, selection)} />
+                            <AccountSelector bac={d.bac} onAccountSelect={(selection) => handleAccountSelect(d.id, selection)} />
                         </div>
                     ))}
                 </div>
