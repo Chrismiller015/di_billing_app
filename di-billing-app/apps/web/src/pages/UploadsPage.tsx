@@ -1,3 +1,4 @@
+// [SOURCE: apps/web/src/pages/UploadsPage.tsx]
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useOutletContext } from "react-router-dom";
@@ -36,7 +37,8 @@ const UploadCard = ({ title, onUpload, isUploading, fileType }) => {
 };
 
 export function UploadsPage() {
-  const { openUploadModal } = useOutletContext<AppContextType>();
+  // This is the fix: Safely destructure with a fallback object.
+  const { openUploadModal = () => {} } = useOutletContext<AppContextType>() || {};
   const queryClient = useQueryClient();
   const uploadsQuery = useQuery({ queryKey: ['uploads'], queryFn: fetchUploads });
 
@@ -129,7 +131,7 @@ export function UploadsPage() {
                 </td>
               </tr>
             ))}
-             {uploadsQuery.data && uploadsQuery.data.length === 0 && (
+              {uploadsQuery.data && uploadsQuery.data.length === 0 && (
               <tr><td colSpan={6} className="text-center p-6 text-slate-500">No GM invoices uploaded yet.</td></tr>
             )}
           </tbody>

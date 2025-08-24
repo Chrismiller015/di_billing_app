@@ -1,30 +1,24 @@
 // [SOURCE: apps/web/src/api.ts]
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
 
+// =========== Dashboard Functions ===========
+
+export async function fetchDashboardStats() {
+  const res = await fetch(`${API_URL}/dashboard/stats`);
+  if (!res.ok) throw new Error("Failed to fetch dashboard stats");
+  return res.json();
+}
+
 // =========== Discrepancy Functions ===========
 
-type DiscrepancyQuery = {
-  program: string;
-  period: string;
-  page?: number;
-  pageSize?: number;
-  bac?: string;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
-};
-
-export async function fetchDiscrepancies(query: DiscrepancyQuery) {
+// This function is simplified as filters are removed for now.
+export async function fetchDiscrepancies(query: { page?: number; pageSize?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; }) {
   const params = new URLSearchParams({
-    program: query.program,
-    period: query.period,
     page: String(query.page || 1),
     pageSize: String(query.pageSize || 50),
     sortBy: query.sortBy || 'variance',
     sortOrder: query.sortOrder || 'desc'
   });
-  if (query.bac) {
-    params.set("bac", query.bac);
-  }
   const res = await fetch(`${API_URL}/discrepancies?${params.toString()}`);
   if (!res.ok) throw new Error("Failed to fetch discrepancies");
   return res.json();
@@ -40,17 +34,18 @@ export async function recalculateDiscrepancies(program: string, period: string) 
   return res.json();
 }
 
+// This endpoint is corrected to match the backend controller.
 export async function fetchAccountsByBac(bac: string) {
-  const res = await fetch(`${API_URL}/discrepancies/accounts-by-bac?bac=${bac}`);
+  const res = await fetch(`${API_URL}/discrepancies/accounts/${bac}`);
   if (!res.ok) throw new Error("Failed to fetch accounts for BAC");
   return res.json();
 }
 
-export async function fetchDiscrepancyDetails(bac: string, program: string, period: string) {
-  const params = new URLSearchParams({ program, period });
-  const res = await fetch(`${API_URL}/discrepancies/${bac}/details?${params.toString()}`);
-  if (!res.ok) throw new Error("Failed to fetch discrepancy details");
-  return res.json();
+// This function is updated to take only the discrepancy ID.
+export async function fetchDiscrepancyDetails(id: string) {
+    const res = await fetch(`${API_URL}/discrepancies/${id}/details`);
+    if (!res.ok) throw new Error("Failed to fetch discrepancy details");
+    return res.json();
 }
 
 
@@ -261,7 +256,7 @@ export async function clearReportEntries(reportId: string) {
     if (!res.ok) throw new Error((await res.json()).message || "Failed to clear report");
     return res.json();
 }
-  
+ 
 export async function deleteReport(reportId: string) {
     const res = await fetch(`${API_URL}/reports/${reportId}`, {
       method: 'DELETE',

@@ -1,202 +1,128 @@
 // [SOURCE: apps/web/src/pages/DiscrepanciesPage.tsx]
-import React, { useState, useRef, useCallback, useEffect } from "react";
-import { useOutletContext } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import toast from "react-hot-toast";
-import { FaFileCsv, FaFilter, FaSearch, FaSpinner, FaSync, FaTimes } from "react-icons/fa";
-import { fetchDiscrepancies, recalculateDiscrepancies } from "../api";
-import { AppContextType } from "../App";
-import { LinesPanel } from "../components/LinesPanel";
-import { AddToReportModal } from "../components/AddToReportModal";
-import { DiscrepanciesTable } from "../components/DiscrepanciesTable";
-import { PaginationControls } from "../components/PaginationControls";
-import { ReportDetailsPane } from "../components/ReportDetailsPane";
-import { TabButton } from "../components/ui/TabButton";
-import { IconBtn } from "../components/ui/IconBtn";
-import { Badge } from "../components/ui/Badge";
-import { dollar } from '../utils';
+import React, { useState, useMemo, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchDiscrepancies } from '../api';
+import { DiscrepanciesTable } from '../components/DiscrepanciesTable';
+import { PaginationControls } from '../components/PaginationControls';
+import { FaPlus, FaClipboardList } from 'react-icons/fa';
+import { AddToReportModal } from '../components/AddToReportModal';
+import { useDiscrepancyStore } from '../store/discrepancyStore';
+import { ReportPane } from '../components/ReportPane';
+import { Outlet } from 'react-router-dom'; // Import Outlet
 
-type Row = {
-  id: string;
-  bac: string;
-  sfName: string;
-  accountCount: number;
-  program: "WEBSITE" | "CHAT" | "TRADE";
-  period: string;
-  sfTotal: number;
-  gmTotal: number;
-  variance: number;
-  status: "OPEN" | "IN_REVIEW" | "RESOLVED";
-  updatedAt: string;
-};
-
-type SortConfig = { key: string; direction: 'asc' | 'desc' };
-
-export function DiscrepanciesPage() {
-  const { program, period } = useOutletContext<AppContextType>();
-  const [tab, setTab] = useState<"discrepancies" | "errors">("discrepancies");
-  const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<string[]>([]);
-  const [drawerRow, setDrawerRow] = useState<Row | null>(null);
-  const [isReportModalOpen, setReportModalOpen] = useState(false);
-  const [isReportPaneOpen, setReportPaneOpen] = useState(false);
-  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'variance', direction: 'desc' });
-  const [page, setPage] = useState(1);
-  const [drawerWidth, setDrawerWidth] = useState(window.innerWidth * 0.5);
-  const isResizing = useRef(false);
+export const DiscrepanciesPage = () => {
   const queryClient = useQueryClient();
+  const { sorting, pagination, setPagination } = useDiscrepancyStore();
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isReportPaneOpen, setIsReportPaneOpen] = useState(false);
+  const lastSelectedIndex = useRef<number | null>(null);
+
+  const queryParams = { ...sorting, ...pagination };
 
   const discrepanciesQuery = useQuery({
-    queryKey: ["discrepancies", program, period, query, sortConfig, page],
-    queryFn: () => fetchDiscrepancies({ program, period, bac: query, sortBy: sortConfig.key, sortOrder: sortConfig.direction, page }),
-    placeholderData: (prev) => prev,
+    queryKey: ['discrepancies', queryParams],
+    queryFn: () => fetchDiscrepancies(queryParams as any),
     keepPreviousData: true,
   });
 
-  const recalculateMutation = useMutation({
-    mutationFn: () => recalculateDiscrepancies(program, period),
-    onSuccess: () => {
-      toast.success("Recalculation started successfully!");
-      queryClient.invalidateQueries({ queryKey: ["discrepancies"] });
-    },
-    onError: (err: Error) => toast.error(`Error: ${err.message}`),
-  });
-
-  useEffect(() => {
-    setPage(1);
-  }, [program, period, query, sortConfig]);
-
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isResizing.current) return;
-    const newWidth = window.innerWidth - e.clientX;
-    if (newWidth > 300 && newWidth < window.innerWidth - 300) {
-      setDrawerWidth(newWidth);
+  const handleRowSelect = (id: string, isSelected: boolean, event: React.ChangeEvent<HTMLInputElement>['nativeEvent'], index?: number) => {
+    if (event.shiftKey && lastSelectedIndex.current !== null && index !== undefined) {
+      const allIds = discrepanciesQuery.data?.rows.map(d => d.id) || [];
+      const start = Math.min(lastSelectedIndex.current, index);
+      const end = Math.max(lastSelectedIndex.current, index);
+      const rangeIds = allIds.slice(start, end + 1);
+      
+      const newSelectedIds = new Set(selectedIds);
+      rangeIds.forEach(rangeId => {
+        if (isSelected) {
+          newSelectedIds.add(rangeId);
+        } else {
+          newSelectedIds.delete(rangeId);
+        }
+      });
+      setSelectedIds(Array.from(newSelectedIds));
+    } else if (id === 'all') {
+      setSelectedIds(isSelected ? discrepanciesQuery.data?.rows.map(d => d.id) || [] : []);
+    } else {
+      setSelectedIds(prev => isSelected ? [...prev, id] : prev.filter(pid => pid !== id));
     }
-  }, []);
 
-  const handleMouseUp = useCallback(() => {
-    isResizing.current = false;
-    window.removeEventListener("mousemove", handleMouseMove);
-    window.removeEventListener("mouseup", handleMouseUp);
-  }, [handleMouseMove]);
-
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isResizing.current = true;
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-  }, [handleMouseMove, handleMouseUp]);
-
-  useEffect(() => {
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [handleMouseMove, handleMouseUp]);
+    if (index !== undefined) {
+      lastSelectedIndex.current = isSelected ? index : null;
+    }
+  };
   
+  const selectedDiscrepancies = useMemo(() => {
+    return discrepanciesQuery.data?.rows.filter(d => selectedIds.includes(d.id)) || [];
+  }, [selectedIds, discrepanciesQuery.data?.rows]);
+
   return (
-    <div className="flex h-full relative">
+    <div className="h-full flex flex-col relative">
+      <div className="flex-shrink-0">
+        <div className="flex items-center justify-between p-4 border-b border-slate-800">
+          <h1 className="text-2xl font-bold">Discrepancies</h1>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setIsModalOpen(true)} disabled={selectedIds.length === 0} className="flex items-center gap-2 px-4 h-10 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium disabled:opacity-50">
+              <FaPlus />
+              Add to Report {selectedIds.length > 0 ? `(${selectedIds.length})` : ''}
+            </button>
+          </div>
+        </div>
+      </div>
+      
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-800 flex items-center gap-2 bg-[#0B1316]">
-          <div className="relative">
-            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search BAC..." className="pl-9 pr-3 h-10 rounded-xl bg-slate-900 border border-slate-700 w-80" />
-          </div>
-          <IconBtn title="Filters" icon={FaFilter} />
-          <div className="ml-auto flex items-center gap-2">
-            <IconBtn 
-              title="Recalculate" 
-              icon={FaSync} 
-              onClick={() => recalculateMutation.mutate()} 
-              disabled={recalculateMutation.isPending} 
-            />
-            <IconBtn title={`Add to Report (${selected.length})`} icon={FaFileCsv} onClick={() => setReportModalOpen(true)} disabled={selected.length === 0} />
-          </div>
-        </div>
-        <div className="px-4 pt-3 flex gap-2 border-b border-slate-800 bg-[#0B1316]">
-          <TabButton active={tab === "discrepancies"} onClick={() => setTab("discrepancies")}>
-            Discrepancies {discrepanciesQuery.data?.total != null ? `(${discrepanciesQuery.data.total})` : ''}
-          </TabButton>
-          <TabButton active={tab === "errors"} onClick={() => setTab("errors")}>Upload Errors (0)</TabButton>
-        </div>
-        <section className="p-4 overflow-auto flex-1">
-          {discrepanciesQuery.isLoading && !discrepanciesQuery.isPlaceholderData ? (
-            <div className="flex justify-center items-center h-full text-slate-400"><FaSpinner className="animate-spin mr-2" /> Loading...</div>
+        <div className="flex-1 overflow-y-auto">
+          {discrepanciesQuery.isLoading ? (
+            <div className="p-4 text-center">Loading discrepancies...</div>
           ) : discrepanciesQuery.isError ? (
-            <div className="text-center text-rose-400">Error: {discrepanciesQuery.error.message}</div>
-          ) : (
+            <div className="p-4 text-center text-red-500">Error loading data.</div>
+          ) : discrepanciesQuery.data ? (
             <>
               <DiscrepanciesTable
-                rows={discrepanciesQuery.data?.rows || []}
-                selected={selected}
-                setSelected={setSelected}
-                onOpen={setDrawerRow}
-                sortConfig={sortConfig}
-                setSortConfig={setSortConfig}
+                data={discrepanciesQuery.data.rows}
+                onRowSelect={handleRowSelect}
+                selectedIds={selectedIds}
               />
-              <PaginationControls 
-                page={discrepanciesQuery.data?.page || 1}
-                pageSize={discrepanciesQuery.data?.pageSize || 50}
-                total={discrepanciesQuery.data?.total || 0}
-                setPage={setPage}
-              />
-            </>
-          )}
-        </section>
-      </div>
-      {drawerRow && (
-        <aside style={{ width: `${drawerWidth}px` }} className="h-full bg-[#10171B] flex shrink-0 border-l border-slate-800">
-          <div onMouseDown={handleMouseDown} className="w-2 h-full cursor-col-resize bg-slate-900 hover:bg-cyan-600 transition-colors" title="Resize"></div>
-          <div className="flex-1 p-4 overflow-auto">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-sm text-slate-400">BAC {drawerRow.bac} • {drawerRow.program} {drawerRow.period}</div>
-                <h2 className="text-xl font-semibold text-slate-100">{drawerRow.sfName || "N/A"}</h2>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <Badge color={drawerRow.variance > 0 ? "red" : drawerRow.variance < 0 ? "green" : "slate"}>Variance {drawerRow.variance > 0 ? "+" : ""}{dollar(drawerRow.variance)}</Badge>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <IconBtn 
-                    title="Add to Report" 
-                    icon={FaFileCsv} 
-                    onClick={() => {
-                        const discrepancies = discrepanciesQuery.data?.rows || [];
-                        const discrepancyToAdd = discrepancies.find(d => d.id === drawerRow.id);
-                        if (discrepancyToAdd) {
-                           setSelected([drawerRow.id]);
-                           setReportModalOpen(true);
-                        }
-                    }}
+              {discrepanciesQuery.data.total > 0 && (
+                 <PaginationControls
+                    page={discrepanciesQuery.data.page}
+                    pageSize={discrepanciesQuery.data.pageSize}
+                    total={discrepanciesQuery.data.total}
+                    onPageChange={(page) => setPagination({ page })}
                 />
-                <button onClick={() => setDrawerRow(null)} className="p-2 rounded-lg hover:bg-slate-800/60"><FaTimes /></button>
-              </div>
-            </div>
-            <div className="mt-4">
-              <LinesPanel bac={drawerRow.bac} program={drawerRow.program} period={drawerRow.period} />
-            </div>
-          </div>
-        </aside>
+              )}
+            </>
+          ) : null}
+        </div>
+      </div>
+
+      {/* This Outlet is where the DiscrepancyDetailsPane will render */}
+      <Outlet />
+
+      {/* This is the restyled floating action button */}
+      <div className="absolute bottom-4 right-4">
+        <button onClick={() => setIsReportPaneOpen(true)} className="flex items-center justify-center gap-2 h-12 px-4 rounded-full bg-slate-700 hover:bg-slate-600 shadow-lg">
+            <FaClipboardList /> <span>View Report</span>
+        </button>
+      </div>
+
+      {isModalOpen && (
+        <AddToReportModal
+          onClose={() => setIsModalOpen(false)}
+          discrepancies={selectedDiscrepancies}
+          program=""
+          period=""
+        />
       )}
-      {isReportModalOpen && 
-        <AddToReportModal 
-          onClose={() => {
-            setReportModalOpen(false);
-            setSelected([]);
-          }} 
-          discrepancies={
-            selected.map(id => (discrepanciesQuery.data?.rows || []).find(r => r.id === id)).filter(Boolean)
-          }
-          program={program}
-          period={period}
-        />}
-      
-      <ReportDetailsPane 
-        program={program} 
-        period={period} 
-        isOpen={isReportPaneOpen}
-        setIsOpen={setReportPaneOpen}
-      />
+
+      {isReportPaneOpen && (
+        <ReportPane
+            program="WEBSITE" 
+            period="2025-08"
+            onClose={() => setIsReportPaneOpen(false)}
+        />
+      )}
     </div>
   );
-}
+};

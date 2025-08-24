@@ -1,3 +1,4 @@
+// [SOURCE: apps/api/src/discrepancies/discrepancies.controller.ts]
 import { Controller, Get, Post, Query, Body, Param, ValidationPipe, UsePipes } from "@nestjs/common";
 import { DiscrepanciesService } from "./discrepancies.service";
 import { ListDiscrepanciesQueryDto } from "./dto/list-discrepancies.dto";
@@ -17,13 +18,11 @@ export class DiscrepanciesController {
     return this.svc.getAccountsByBac(bac);
   }
 
-  @Get(':bac/details')
-  async getDetails(
-    @Param('bac') bac: string,
-    @Query('program') program: string,
-    @Query('period') period: string,
-  ) {
-    return this.svc.getDetails(bac, program, period);
+  // This is the fix: The route now correctly uses the unique 'id'.
+  @Get(':id/details')
+  async getDetails(@Param('id') id: string) {
+    // We now pass the unique ID to the service.
+    return this.svc.getDetails(id);
   }
 
   @Post("recalculate")

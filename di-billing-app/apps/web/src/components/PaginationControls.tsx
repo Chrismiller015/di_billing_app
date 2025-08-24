@@ -1,42 +1,38 @@
+// [SOURCE: apps/web/src/components/PaginationControls.tsx]
 import React from 'react';
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
-type PaginationControlsProps = {
-    page: number;
-    pageSize: number;
-    total: number;
-    setPage: (page: number) => void;
-};
+export const PaginationControls = ({ page, pageSize, total, onPageChange }) => {
+  const totalPages = Math.ceil(total / pageSize);
 
-export const PaginationControls = ({ page, pageSize, total, setPage }: PaginationControlsProps) => {
-    const totalPages = Math.ceil(total / pageSize);
-    const startItem = total === 0 ? 0 : (page - 1) * pageSize + 1;
-    const endItem = Math.min(page * pageSize, total);
+  // This is the fix: The component now correctly uses the 'onPageChange' prop.
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      onPageChange(newPage);
+    }
+  };
 
-    return (
-        <div className="flex items-center justify-between mt-4 text-sm text-slate-400">
-            <div>
-                Showing <span className="font-medium text-slate-200">{startItem}</span> - <span className="font-medium text-slate-200">{endItem}</span> of <span className="font-medium text-slate-200">{total}</span>
-            </div>
-            <div className="flex items-center gap-2">
-                <button
-                    onClick={() => setPage(page - 1)}
-                    disabled={page <= 1}
-                    className="inline-flex items-center gap-2 px-3 h-9 rounded-xl border border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700/70 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    <FaChevronLeft />
-                    <span>Previous</span>
-                </button>
-                <button
-                    onClick={() => setPage(page + 1)}
-                    disabled={page >= totalPages}
-                    className="inline-flex items-center gap-2 px-3 h-9 rounded-xl border border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700/70 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    <span>Next</span>
-                    <FaChevronRight />
-                </button>
-            </div>
-        </div>
-    );
+  return (
+    <div className="flex items-center justify-between p-4 bg-[#10171B] border-t border-slate-800">
+      <span className="text-sm text-slate-400">
+        Page {page} of {totalPages} ({total} items)
+      </span>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => handlePageChange(page - 1)}
+          disabled={page === 1}
+          className="px-3 h-8 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-50"
+        >
+          <FaChevronLeft />
+        </button>
+        <button
+          onClick={() => handlePageChange(page + 1)}
+          disabled={page === totalPages}
+          className="px-3 h-8 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-50"
+        >
+          <FaChevronRight />
+        </button>
+      </div>
+    </div>
+  );
 };
-// --- END OF FILE ---

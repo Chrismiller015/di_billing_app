@@ -1,110 +1,113 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { FaSort, FaSortUp, FaSortDown } from 'react-icons/fa';
-import { Badge } from './ui/Badge';
-import { dollar } from '../utils';
+// [SOURCE: apps/web/src/components/DiscrepanciesTable.tsx]
+import React from 'react';
+import {
+  createColumnHelper,
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+} from '@tanstack/react-table';
+import { FaArrowUp, FaArrowDown } from 'react-icons/fa';
+import { formatCurrency } from '../utils';
+import { Badge } from './ui/badge';
+import { useDiscrepancyStore } from '../store/discrepancyStore';
+import { useNavigate } from 'react-router-dom';
 
-const Th = ({ children, className = '' }: { children: React.ReactNode, className?: string }) => (
-    <th className={`px-3 py-2 font-medium ${className}`}>{children}</th>
-);
+const columnHelper = createColumnHelper<any>();
 
-const SortableTh = ({ children, sortKey, sortConfig, setSortConfig, className = '' }) => {
-    const isSorted = sortConfig.key === sortKey;
-    const direction = isSorted ? sortConfig.direction : null;
+const columns = [
+    columnHelper.accessor('bac', { header: 'BAC' }),
+    columnHelper.accessor('sfName', { header: 'Salesforce Name' }),
+    columnHelper.accessor('program', { header: 'Program', cell: info => <Badge>{info.getValue()}</Badge> }),
+    columnHelper.accessor('period', { header: 'Period' }),
+    columnHelper.accessor('sfTotal', { header: 'SF Total', cell: info => formatCurrency(info.getValue()), meta: { isNumeric: true } }),
+    columnHelper.accessor('gmTotal', { header: 'GM Total', cell: info => formatCurrency(info.getValue()), meta: { isNumeric: true } }),
+    columnHelper.accessor('variance', {
+        header: 'Variance',
+        cell: info => {
+            const value = info.getValue();
+            const color = value > 0 ? 'text-green-400' : 'text-red-400';
+            return <span className={color}>{formatCurrency(value)}</span>
+        },
+        meta: { isNumeric: true }
+    }),
+    columnHelper.accessor('status', { header: 'Status', cell: info => <Badge>{info.getValue()}</Badge> }),
+];
 
-    const handleClick = () => {
-        let newDirection: 'asc' | 'desc' = 'desc';
-        if(isSorted && direction === 'desc') {
-            newDirection = 'asc';
-        }
-        setSortConfig({ key: sortKey, direction: newDirection });
-    };
+export const DiscrepanciesTable = ({ data = [], onRowSelect, selectedIds }) => {
+  const { sorting, setSorting } = useDiscrepancyStore();
+  const navigate = useNavigate();
 
-    return (
-        <th className={`px-3 py-2 font-medium cursor-pointer hover:bg-slate-800 ${className}`} onClick={handleClick}>
-            <div className={`flex items-center gap-2 ${className.includes('text-right') ? 'justify-end' : 'justify-start'}`}>
-                <span>{children}</span>
-                {direction === 'asc' ? <FaSortUp/> : direction === 'desc' ? <FaSortDown/> : <FaSort className="opacity-30"/>}
-            </div>
-        </th>
-    );
-};
-
-export const DiscrepanciesTable = ({ rows, selected, setSelected, onOpen, sortConfig, setSortConfig }) => {
-  const headerCheckboxRef = useRef<HTMLInputElement>(null);
-  const [lastCheckedIndex, setLastCheckedIndex] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (headerCheckboxRef.current) {
-      const numSelected = selected.length;
-      const numRows = rows.length;
-      headerCheckboxRef.current.checked = numSelected === numRows && numRows > 0;
-      headerCheckboxRef.current.indeterminate = numSelected > 0 && numSelected < numRows;
+  const table = useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    manualSorting: true,
+    state: {
+        sorting: [sorting]
     }
-  }, [selected, rows]);
+  });
 
-  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked) {
-      setSelected(rows.map(r => r.id));
-    } else {
-      setSelected([]);
-    }
+  const handleSort = (columnId: string) => {
+    const isDesc = sorting.sortBy === columnId && sorting.sortOrder === 'desc';
+    setSorting({ sortBy: columnId, sortOrder: isDesc ? 'asc' : 'desc' });
   };
 
-  const handleRowCheckboxChange = (e: React.MouseEvent, id: string, index: number) => {
-    e.stopPropagation();
-
-    if (e.nativeEvent.shiftKey && lastCheckedIndex !== null) {
-        const start = Math.min(lastCheckedIndex, index);
-        const end = Math.max(lastCheckedIndex, index);
-        const rangeIds = rows.slice(start, end + 1).map(r => r.id);
-        
-        const currentSelected = new Set(selected);
-        const rowIsSelected = currentSelected.has(id);
-
-        if (rowIsSelected) {
-            rangeIds.forEach(rid => currentSelected.delete(rid));
-        } else {
-            rangeIds.forEach(rid => currentSelected.add(rid));
-        }
-        setSelected(Array.from(currentSelected));
-
-    } else {
-        setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-    }
-    setLastCheckedIndex(index);
+  const handleRowClick = (row: any) => {
+    // This is feature #1: Clicking a row navigates to the (future) details page.
+    navigate(`/discrepancies/${row.original.id}`);
   };
-
+  
   return (
-    <div className="rounded-xl border border-slate-800 overflow-hidden bg-[#0E1417]">
-      <table className="w-full text-sm">
-        <thead className="bg-slate-900/60 text-slate-300">
-          <tr className="text-left">
-            <Th><input type="checkbox" ref={headerCheckboxRef} onChange={handleSelectAll} /></Th>
-            <SortableTh sortKey="bac" {...{sortConfig, setSortConfig}}>BAC</SortableTh>
-            <SortableTh sortKey="sfName" {...{sortConfig, setSortConfig}}>Salesforce Name</SortableTh>
-            <SortableTh sortKey="sfTotal" {...{sortConfig, setSortConfig}} className="text-right">SF Total $</SortableTh>
-            <SortableTh sortKey="gmTotal" {...{sortConfig, setSortConfig}} className="text-right">GM Total $</SortableTh>
-            <SortableTh sortKey="variance" {...{sortConfig, setSortConfig}} className="text-right">Variance $</SortableTh>
-            <SortableTh sortKey="status" {...{sortConfig, setSortConfig}}>Status</SortableTh>
-            <SortableTh sortKey="updatedAt" {...{sortConfig, setSortConfig}}>Last Updated</SortableTh>
-          </tr>
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm text-left text-slate-400">
+        <thead className="text-xs text-slate-400 uppercase bg-[#10171B] border-b border-slate-800">
+          {table.getHeaderGroups().map(headerGroup => (
+            <tr key={headerGroup.id}>
+              <th scope="col" className="p-4 w-10">
+                <input
+                  type="checkbox"
+                  onChange={(e) => onRowSelect('all', e.target.checked, e.nativeEvent)}
+                  checked={selectedIds.length === data.length && data.length > 0}
+                  className="w-4 h-4 text-cyan-600 bg-slate-700 border-slate-600 rounded focus:ring-cyan-500"
+                />
+              </th>
+              {headerGroup.headers.map(header => (
+                <th key={header.id} scope="col" className="px-6 py-3 cursor-pointer" onClick={() => handleSort(header.id)}>
+                    <div className="flex items-center gap-2">
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        {sorting.sortBy === header.id && (
+                            <span>{sorting.sortOrder === 'desc' ? <FaArrowDown/> : <FaArrowUp/>}</span>
+                        )}
+                    </div>
+                </th>
+              ))}
+            </tr>
+          ))}
         </thead>
         <tbody>
-          {rows.map((r, index) => (
-            <tr key={r.id} className="border-t border-slate-800 hover:bg-slate-800/40 cursor-pointer" onClick={() => onOpen(r)}>
-              <td className="px-3 py-2"><input type="checkbox" checked={selected.includes(r.id)} onClick={(e) => handleRowCheckboxChange(e, r.id, index)} onChange={()=>{}} /></td>
-              <td className="px-3 py-2 font-mono text-xs">{r.bac}</td>
-              <td className="px-3 py-2">{r.sfName || "N/A"}</td>
-              <td className="px-3 py-2 text-right">{dollar(r.sfTotal)}</td>
-              <td className="px-3 py-2 text-right">{dollar(r.gmTotal)}</td>
-              <td className="px-3 py-2 text-right" style={{color: r.variance > 0 ? '#fca5a5' : '#86efac'}}>{r.variance > 0 ? "+" : ""}{dollar(r.variance)}</td>
-              <td className="px-3 py-2"><Badge color={r.status === "OPEN" ? "red" : r.status === "IN_REVIEW" ? "yellow" : "green"}>{r.status}</Badge></td>
-              <td className="px-3 py-2 text-slate-400">{new Date(r.updatedAt).toLocaleString()}</td>
+          {table.getRowModel().rows.map((row, index) => (
+            <tr
+              key={row.id}
+              // Add a highlight style for selected rows
+              className={`border-b border-slate-800 ${selectedIds.includes(row.original.id) ? 'bg-cyan-900/50' : 'hover:bg-slate-800/40'}`}
+            >
+              <td className="w-4 p-4">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.includes(row.original.id)}
+                  onChange={(e) => onRowSelect(row.original.id, e.target.checked, e.nativeEvent, index)}
+                  className="w-4 h-4 text-cyan-600 bg-slate-700 border-slate-600 rounded focus:ring-cyan-500"
+                />
+              </td>
+              {row.getVisibleCells().map(cell => (
+                <td key={cell.id} className="px-6 py-4 cursor-pointer" onClick={() => handleRowClick(row)}>
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </td>
+              ))}
             </tr>
           ))}
         </tbody>
       </table>
-      {rows.length === 0 && <div className="p-10 text-center text-slate-400"><p className="mb-3">No discrepancies found for this filter.</p></div>}
     </div>
   );
-}
+};

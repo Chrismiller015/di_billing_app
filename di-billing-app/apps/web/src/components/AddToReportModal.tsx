@@ -37,6 +37,11 @@ export const AddToReportModal = ({ onClose, discrepancies, program, period }) =>
   const [newReportName, setNewReportName] = useState(`Report ${new Date().toLocaleDateString()}`);
   const [accountSelections, setAccountSelections] = useState({});
 
+  // FOR DEBUGGING: Log the incoming discrepancies to check their structure
+  useEffect(() => {
+    console.log("Discrepancies received by modal:", discrepancies);
+  }, [discrepancies]);
+
   const multiAccountDiscrepancies = discrepancies.filter(d => d.accountCount > 1);
 
   const reportsQuery = useQuery({ queryKey: ['reports'], queryFn: fetchReports });
@@ -71,6 +76,9 @@ export const AddToReportModal = ({ onClose, discrepancies, program, period }) =>
   });
 
   const handleNextStep = () => {
+    // FOR DEBUGGING: Log the derived multi-account discrepancies
+    console.log("Multi-account discrepancies found:", multiAccountDiscrepancies);
+
     if (!selectedReportId) {
         toast.error("Please select or create a report first.");
         return;
@@ -85,13 +93,13 @@ export const AddToReportModal = ({ onClose, discrepancies, program, period }) =>
   const handleSubmit = async () => {
     const entriesPromise = discrepancies.map(async (d) => {
         let accountDetails = { name: d.sfName, sfid: null, isPrimary: null };
+
         if (d.accountCount > 1) {
             const selection = accountSelections[d.id];
             if (selection) {
                 accountDetails = { ...selection };
             }
-        } else {
-            // This is the fix: fetch account details for single-account BACs
+        } else if (d.accountCount === 1) {
             try {
                 const accounts = await fetchAccountsByBac(d.bac);
                 if (accounts && accounts.length > 0) {
@@ -103,7 +111,7 @@ export const AddToReportModal = ({ onClose, discrepancies, program, period }) =>
                     };
                 }
             } catch (err) {
-                console.error("Failed to fetch account for single BAC", err);
+                console.error(`Failed to fetch account for single BAC ${d.bac}`, err);
             }
         }
 

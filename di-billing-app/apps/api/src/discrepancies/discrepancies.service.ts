@@ -1,5 +1,5 @@
 // [SOURCE: apps/api/src/discrepancies/discrepancies.service.ts]
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { Program } from "@prisma/client";
 import { ListDiscrepanciesQueryDto } from "./dto/list-discrepancies.dto";
@@ -11,11 +11,12 @@ export class DiscrepanciesService {
 
   async list(query: ListDiscrepanciesQueryDto) {
     const { program, period, status, bac, page, pageSize, sortBy, sortOrder } = query;
+    
     const where: any = {};
-    if (program) where.program = program as Program;
-    if (period) where.period = period;
-    if (status) where.status = status as any;
-    if (bac) where.bac = { contains: bac, mode: 'insensitive' };
+    if (program && program !== 'undefined') where.program = program as Program;
+    if (period && period !== 'undefined') where.period = period;
+    if (status && status !== 'undefined') where.status = status as any;
+    if (bac && bac !== 'undefined') where.bac = { contains: bac, mode: 'insensitive' };
 
     const validSortKeys = ['bac', 'sfName', 'sfTotal', 'gmTotal', 'variance', 'status', 'updatedAt'];
     const orderBy = validSortKeys.includes(sortBy) && sortOrder ? { [sortBy]: sortOrder } : { variance: 'desc' };
@@ -45,6 +46,46 @@ export class DiscrepanciesService {
     return { rows, total, page, pageSize };
   }
   
+  // This is the fix: The method now looks up the discrepancy by its unique ID first.
+  async getDetails(id: string) {
+    const discrepancy = await this.db.discrepancy.findUnique({ where: { id } });
+
+    if (!discrepancy) {
+      throw new NotFoundException(`Discrepancy with ID ${id} not found.`);
+    }
+    const { bac, program, period } = discrepancy;
+
+    const sfLines = await this.db.subscription.findMany({
+      where: {
+        account: { bac },
+        program: program as Program,
+        isLive: true,
+      },
+      select: { 
+        productCode: true, 
+        unitPrice: true, 
+        qty: true,
+        account: { select: { name: true } }
+      },
+      orderBy: { unitPrice: 'desc' }
+    });
+
+    const gmInvoice = await this.db.gMInvoice.findFirst({
+      where: { program: program as Program, period, current: true }
+    });
+
+    let gmLines = [];
+    if (gmInvoice) {
+      gmLines = await this.db.gMInvoiceLine.findMany({
+        where: { invoiceId: gmInvoice.id, bac },
+        select: { productCode: true, name: true, unitPrice: true, qty: true },
+        orderBy: { unitPrice: 'desc' }
+      });
+    }
+    // The return object now includes the discrepancy itself, which the frontend needs.
+    return { discrepancy, sfLines, gmLines };
+  }
+
   async recalculate(program: string, period: string) {
     this.logger.log(`Recalculating discrepancies for Program: "${program}", Period: "${period}"`);
     
@@ -135,37 +176,5 @@ export class DiscrepanciesService {
       where: { bac },
       select: { sfid: true, name: true, isPrimary: true },
     });
-  }
-
-  async getDetails(bac: string, program: string, period: string) {
-    const sfLines = await this.db.subscription.findMany({
-      where: {
-        account: { bac },
-        program: program as Program,
-        isLive: true,
-      },
-      select: { 
-        productCode: true, 
-        unitPrice: true, 
-        qty: true,
-        account: { select: { name: true } }
-      },
-      orderBy: { unitPrice: 'desc' }
-    });
-
-    const gmInvoice = await this.db.gMInvoice.findFirst({
-      where: { program: program as Program, period, current: true }
-    });
-
-    let gmLines = [];
-    if (gmInvoice) {
-      gmLines = await this.db.gMInvoiceLine.findMany({
-        where: { invoiceId: gmInvoice.id, bac },
-        select: { productCode: true, name: true, unitPrice: true, qty: true },
-        orderBy: { unitPrice: 'desc' }
-      });
-    }
-
-    return { sfLines, gmLines };
   }
 }

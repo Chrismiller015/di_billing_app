@@ -1,3 +1,4 @@
+// [SOURCE: apps/web/src/App.tsx]
 import React, { useState } from "react";
 import { Routes, Route, Outlet } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
@@ -9,17 +10,19 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { UploadsPage } from "./pages/UploadsPage";
 import { MappingsPage } from "./pages/MappingsPage";
 import { ReportsPage } from "./pages/ReportsPage";
+import { DiscrepancyDetailsPane } from "./components/DiscrepancyDetailsPane";
 
 export type AppContextType = {
-  program: "WEBSITE" | "CHAT" | "TRADE";
-  period: string;
   openUploadModal: () => void;
+};
+
+// This new Layout component provides the context to all child routes.
+const AppLayout = ({ setUploadModalOpen }) => {
+  return <Outlet context={{ openUploadModal: () => setUploadModalOpen(true) } satisfies AppContextType} />;
 };
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [program, setProgram] = useState<"WEBSITE" | "CHAT" | "TRADE">("WEBSITE");
-  const [period, setPeriod] = useState(new Date().toISOString().slice(0, 7));
   const [isUploadModalOpen, setUploadModalOpen] = useState(false);
 
   return (
@@ -29,10 +32,6 @@ export default function App() {
         <button className="p-2 rounded-lg hover:bg-slate-800/60" onClick={() => setSidebarOpen(s => !s)} aria-label="Toggle sidebar"><FaBars /></button>
         <div className="font-semibold tracking-wide text-slate-100">di-billing-app</div>
         <div className="ml-auto flex items-center gap-2">
-          <select value={program} onChange={e => setProgram(e.target.value as any)} className="h-9 bg-slate-900 border border-slate-700 rounded-lg px-2">
-            <option>WEBSITE</option><option>CHAT</option><option>TRADE</option>
-          </select>
-          <input type="month" value={period} onChange={e => setPeriod(e.target.value)} className="h-9 bg-slate-900 border border-slate-700 rounded-lg px-2" />
           <button onClick={() => setUploadModalOpen(true)} title="Upload" className="inline-flex items-center gap-2 px-3 h-9 rounded-xl border border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700/70 transition">
             <FaCloudUploadAlt /><span className="text-sm">Upload</span>
           </button>
@@ -50,11 +49,15 @@ export default function App() {
             <NavItem to="/reports" icon={FaClipboardList} label="Reports" />
           </aside>
         )}
-        <main className="flex-1 flex flex-col overflow-hidden">
+        <main className="flex-1 flex flex-col overflow-hidden relative">
           <Routes>
-            <Route path="/" element={<Outlet context={{ program, period, openUploadModal: () => setUploadModalOpen(true) } satisfies AppContextType} />}>
-              <Route index element={<DashboardPage />} />
-              <Route path="discrepancies" element={<DiscrepanciesPage />} />
+            {/* The Layout route now wraps all pages, providing the context. */}
+            <Route element={<AppLayout setUploadModalOpen={setUploadModalOpen} />}>
+              <Route path="/" element={<DashboardPage />} />
+              <Route path="discrepancies" element={<DiscrepanciesPage />}>
+                {/* The details pane route is nested, as intended. */}
+                <Route path=":discrepancyId" element={<DiscrepancyDetailsPane />} />
+              </Route>
               <Route path="uploads" element={<UploadsPage />} />
               <Route path="mappings" element={<MappingsPage />} />
               <Route path="reports" element={<ReportsPage />} />
