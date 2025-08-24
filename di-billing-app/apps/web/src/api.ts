@@ -221,19 +221,19 @@ export async function addDiscrepanciesToReport(reportId: string, entries: any[])
   return res.json();
 }
 
-export async function downloadReport(reportId: string, reportName: string) {
+export async function downloadReport(reportId: string) {
   const res = await fetch(`${API_URL}/reports/${reportId}/export`);
   if (!res.ok) throw new Error("Failed to download report");
   const blob = await res.blob();
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  const fileName = `${reportName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  window.URL.revokeObjectURL(url);
+  const contentDisposition = res.headers.get('content-disposition');
+  let fileName = 'report.xlsx';
+  if (contentDisposition) {
+    const match = contentDisposition.match(/filename="(.+)"/);
+    if (match) {
+      fileName = match[1];
+    }
+  }
+  return { data: blob, fileName };
 }
 
 export async function updateReportEntry(id: string, data: { category?: string; notes?: string; specificAccountName?: string; specificSalesforceId?: string; isPrimary?: boolean; }) {
@@ -254,7 +254,7 @@ export async function deleteReportEntry(id: string) {
   return res.json();
 }
 
-export async function clearReport(reportId: string) {
+export async function clearReportEntries(reportId: string) {
     const res = await fetch(`${API_URL}/reports/${reportId}/entries`, {
       method: 'DELETE',
     });
