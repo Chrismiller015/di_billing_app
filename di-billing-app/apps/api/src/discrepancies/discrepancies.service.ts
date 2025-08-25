@@ -89,13 +89,18 @@ export class DiscrepanciesService {
   async recalculate(program: string, period: string) {
     this.logger.log(`Recalculating discrepancies for Program: "${program}", Period: "${period}"`);
     
-    const sfAgg = await this.db.subscription.groupBy({
-      by: ["accountId"],
+    const subscriptions = await this.db.subscription.findMany({
       where: { program: program as Program, isLive: true },
-      _sum: { unitPrice: true },
+      select: { accountId: true, unitPrice: true, qty: true },
     });
-    
-    const accountIds = sfAgg.map((a) => a.accountId);
+
+    const sfAgg = new Map<string, number>();
+    for (const sub of subscriptions) {
+      const total = sub.unitPrice * sub.qty;
+      sfAgg.set(sub.accountId, (sfAgg.get(sub.accountId) || 0) + total);
+    }
+
+    const accountIds = Array.from(sfAgg.keys());
     const accounts = await this.db.account.findMany({
       where: { id: { in: accountIds } },
       select: { id: true, sfid: true, bac: true, name: true, isPrimary: true },
@@ -110,15 +115,15 @@ export class DiscrepanciesService {
     }
 
     const sfByBac = new Map<string, { total: number; accounts: {sfid: string, name: string, isPrimary: boolean}[] }>();
-    for (const a of sfAgg) {
-      const acc = accounts.find((x) => x.id === a.accountId);
+    for (const [accountId, total] of sfAgg.entries()) {
+      const acc = accounts.find((x) => x.id === accountId);
       if (!acc) continue;
-      
+
       const accs = bacToAccounts.get(acc.bac) || [];
-      
+
       const current = sfByBac.get(acc.bac) || { total: 0, accounts: accs };
       sfByBac.set(acc.bac, {
-        total: current.total + (a._sum.unitPrice || 0),
+        total: current.total + total,
         accounts: accs,
       });
     }
