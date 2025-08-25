@@ -59,7 +59,6 @@ const EditableAccountCell = ({ row, editingRow, setEditingRow }) => {
   );
 };
 
-
 export const ReportPane = ({ program, period, onClose }) => {
   const queryClient = useQueryClient();
   const [editingRow, setEditingRow] = useState<any>(null);
@@ -160,6 +159,7 @@ export const ReportPane = ({ program, period, onClose }) => {
             </>
           ) : (
             <>
+              {/* Keep Codex behavior: always show Edit */}
               <button onClick={() => handleEdit(row)} className="text-blue-500 hover:text-blue-400">
                 <FaEdit />
               </button>
