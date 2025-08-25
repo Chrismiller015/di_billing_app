@@ -59,7 +59,6 @@ const EditableAccountCell = ({ row, editingRow, setEditingRow }) => {
   );
 };
 
-
 export const ReportPane = ({ program, period, onClose }) => {
   const queryClient = useQueryClient();
   const [editingRow, setEditingRow] = useState<any>(null);
@@ -160,11 +159,10 @@ export const ReportPane = ({ program, period, onClose }) => {
             </>
           ) : (
             <>
-              {row.original.discrepancy.accountCount > 1 && (
-                <button onClick={() => handleEdit(row)} className="text-blue-500 hover:text-blue-400">
-                  <FaEdit />
-                </button>
-              )}
+              {/* Keep Codex behavior: always show Edit */}
+              <button onClick={() => handleEdit(row)} className="text-blue-500 hover:text-blue-400">
+                <FaEdit />
+              </button>
               <button onClick={() => deleteEntryMutation.mutate(row.original.id)} className="text-red-500 hover:text-red-400">
                 <FaTrash />
               </button>

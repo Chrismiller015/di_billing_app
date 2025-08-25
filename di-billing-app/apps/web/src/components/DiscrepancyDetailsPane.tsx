@@ -44,14 +44,14 @@ export const DiscrepancyDetailsPane = () => {
               Error loading details.
             </div>
           ) : detailsQuery.data ? (
-            <div className="flex">
-              <div className="w-1/2">
-                <LinesPanel title="Salesforce Lines" lines={detailsQuery.data.sfLines} />
+              <div className="flex">
+                <div className="w-1/2">
+                  <LinesPanel title="Salesforce Lines" lines={detailsQuery.data.sfLines} type="sf" />
+                </div>
+                <div className="w-1/2 border-l border-slate-800">
+                  <LinesPanel title="GM Invoice Lines" lines={detailsQuery.data.gmLines} type="gm" />
+                </div>
               </div>
-              <div className="w-1/2 border-l border-slate-800">
-                <LinesPanel title="GM Invoice Lines" lines={detailsQuery.data.gmLines} />
-              </div>
-            </div>
           ) : (
             <div className="p-4 text-center text-slate-500">No details found for this discrepancy.</div>
           )}

@@ -18,8 +18,11 @@ export class DiscrepanciesService {
     if (status && status !== 'undefined') where.status = status as any;
     if (bac && bac !== 'undefined') where.bac = { contains: bac, mode: 'insensitive' };
 
-    const validSortKeys = ['bac', 'sfName', 'sfTotal', 'gmTotal', 'variance', 'status', 'updatedAt'];
-    const orderBy = validSortKeys.includes(sortBy) && sortOrder ? { [sortBy]: sortOrder } : { variance: 'desc' };
+    const validSortKeys = ['bac', 'sfName', 'sfTotal', 'gmTotal', 'variance', 'status', 'updatedAt'] as const;
+    const orderBy =
+      sortBy && (validSortKeys as readonly string[]).includes(sortBy) && sortOrder
+        ? { [sortBy]: sortOrder }
+        : { variance: 'desc' };
 
     const [rows, total] = await this.db.$transaction([
       this.db.discrepancy.findMany({
@@ -74,7 +77,7 @@ export class DiscrepanciesService {
       where: { program: program as Program, period, current: true }
     });
 
-    let gmLines = [];
+    let gmLines: { productCode: string; name: string; unitPrice: number; qty: number }[] = [];
     if (gmInvoice) {
       gmLines = await this.db.gMInvoiceLine.findMany({
         where: { invoiceId: gmInvoice.id, bac },
@@ -91,41 +94,32 @@ export class DiscrepanciesService {
     
     const subscriptions = await this.db.subscription.findMany({
       where: { program: program as Program, isLive: true },
-      select: { accountId: true, unitPrice: true, qty: true },
+      select: {
+        unitPrice: true,
+        qty: true,
+        account: { select: { bac: true, name: true, sfid: true, isPrimary: true } },
+      },
     });
 
-    const sfAgg = new Map<string, number>();
+    const sfByBac = new Map<
+      string,
+      { total: number; accounts: { sfid: string; name: string; isPrimary: boolean }[] }
+    >();
+
     for (const sub of subscriptions) {
       const total = sub.unitPrice * sub.qty;
-      sfAgg.set(sub.accountId, (sfAgg.get(sub.accountId) || 0) + total);
-    }
-
-    const accountIds = Array.from(sfAgg.keys());
-    const accounts = await this.db.account.findMany({
-      where: { id: { in: accountIds } },
-      select: { id: true, sfid: true, bac: true, name: true, isPrimary: true },
-    });
-    
-    const bacToAccounts = new Map<string, {sfid: string, name: string, isPrimary: boolean}[]>();
-    for (const acc of accounts) {
-        if (!bacToAccounts.has(acc.bac)) {
-            bacToAccounts.set(acc.bac, []);
-        }
-        bacToAccounts.get(acc.bac)!.push({ sfid: acc.sfid, name: acc.name, isPrimary: acc.isPrimary });
-    }
-
-    const sfByBac = new Map<string, { total: number; accounts: {sfid: string, name: string, isPrimary: boolean}[] }>();
-    for (const [accountId, total] of sfAgg.entries()) {
-      const acc = accounts.find((x) => x.id === accountId);
-      if (!acc) continue;
-
-      const accs = bacToAccounts.get(acc.bac) || [];
-
-      const current = sfByBac.get(acc.bac) || { total: 0, accounts: accs };
-      sfByBac.set(acc.bac, {
-        total: current.total + total,
-        accounts: accs,
-      });
+      const bac = sub.account.bac;
+      const accInfo = {
+        sfid: sub.account.sfid,
+        name: sub.account.name,
+        isPrimary: sub.account.isPrimary,
+      };
+      const current = sfByBac.get(bac) || { total: 0, accounts: [] as { sfid: string; name: string; isPrimary: boolean }[] };
+      current.total += total;
+      if (!current.accounts.find(a => a.sfid === accInfo.sfid)) {
+        current.accounts.push(accInfo);
+      }
+      sfByBac.set(bac, current);
     }
 
     const invoice = await this.db.gMInvoice.findFirst({
@@ -150,9 +144,19 @@ export class DiscrepanciesService {
     }
 
     const allBacs = new Set<string>([...sfByBac.keys(), ...gmByBac.keys()]);
-    const rows = [];
+    const rows: {
+      bac: string;
+      program: Program;
+      period: string;
+      sfName: string;
+      accountCount: number;
+      sfTotal: number;
+      gmTotal: number;
+      variance: number;
+    }[] = [];
+
     for (const bac of allBacs) {
-      const sfData = sfByBac.get(bac) || { total: 0, accounts: [] };
+      const sfData = sfByBac.get(bac) || { total: 0, accounts: [] as { sfid: string; name: string; isPrimary: boolean }[] };
       const gmTotal = gmByBac.get(bac) || 0;
       const variance = sfData.total - gmTotal;
       if (Math.abs(variance) > 0.01) {
