@@ -1,6 +1,6 @@
 // [SOURCE: apps/web/src/pages/DiscrepanciesPage.tsx]
 import React, { useState, useMemo, useRef } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { fetchDiscrepancies } from '../api';
 import { DiscrepanciesTable } from '../components/DiscrepanciesTable';
 import { PaginationControls } from '../components/PaginationControls';
@@ -11,14 +11,14 @@ import { ReportPane } from '../components/ReportPane';
 import { Outlet } from 'react-router-dom'; // Import Outlet
 
 export const DiscrepanciesPage = () => {
-  const queryClient = useQueryClient();
   const { sorting, pagination, setPagination } = useDiscrepancyStore();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isReportPaneOpen, setIsReportPaneOpen] = useState(false);
   const lastSelectedIndex = useRef<number | null>(null);
+  const [filters, setFilters] = useState<{ bac: string; program: string }>({ bac: '', program: '' });
 
-  const queryParams = { ...sorting, ...pagination };
+  const queryParams = { ...sorting, ...pagination, ...filters };
 
   const discrepanciesQuery = useQuery({
     queryKey: ['discrepancies', queryParams],
@@ -63,6 +63,29 @@ export const DiscrepanciesPage = () => {
         <div className="flex items-center justify-between p-4 border-b border-slate-800">
           <h1 className="text-2xl font-bold">Discrepancies</h1>
           <div className="flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="BAC"
+              value={filters.bac}
+              onChange={(e) => {
+                setPagination({ page: 1 });
+                setFilters(f => ({ ...f, bac: e.target.value }));
+              }}
+              className="h-10 bg-slate-800 border border-slate-700 rounded-lg px-2"
+            />
+            <select
+              value={filters.program}
+              onChange={(e) => {
+                setPagination({ page: 1 });
+                setFilters(f => ({ ...f, program: e.target.value }));
+              }}
+              className="h-10 bg-slate-800 border border-slate-700 rounded-lg px-2"
+            >
+              <option value="">All Programs</option>
+              <option value="WEBSITE">Website</option>
+              <option value="CHAT">Chat</option>
+              <option value="TRADE">Trade</option>
+            </select>
             <button onClick={() => setIsModalOpen(true)} disabled={selectedIds.length === 0} className="flex items-center gap-2 px-4 h-10 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium disabled:opacity-50">
               <FaPlus />
               Add to Report {selectedIds.length > 0 ? `(${selectedIds.length})` : ''}

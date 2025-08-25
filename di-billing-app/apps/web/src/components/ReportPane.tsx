@@ -15,42 +15,48 @@ import { formatCurrency } from '../utils';
 const columnHelper = createColumnHelper<any>();
 
 // A new component for the editable account dropdown.
-const EditableAccountCell = ({ row, editingRow, setEditingRow, onSave }) => {
-    const original = row.original;
-    const bac = original.discrepancy.bac;
+const EditableAccountCell = ({ row, editingRow, setEditingRow }) => {
+  const original = row.original;
+  const bac = original.discrepancy.bac;
+  const isMulti = original.discrepancy.accountCount > 1;
 
-    const accountsQuery = useQuery({
-        queryKey: ['accountsByBac', bac],
-        queryFn: () => fetchAccountsByBac(bac),
-        enabled: editingRow?.id === original.id, // Only fetch when editing this row
-    });
+  const accountsQuery = useQuery({
+    queryKey: ['accountsByBac', bac],
+    queryFn: () => fetchAccountsByBac(bac),
+    enabled: isMulti,
+  });
 
-    if (editingRow?.id !== original.id) {
-        return original.specificAccountName;
-    }
+  if (!isMulti) {
+    return original.specificAccountName;
+  }
 
-    if (accountsQuery.isLoading) return <FaSpinner className="animate-spin" />;
+  if (editingRow?.id !== original.id) {
+    return original.specificAccountName;
+  }
 
-    return (
-        <select
-            value={editingRow.specificSalesforceId || ''}
-            onChange={(e) => {
-                const selectedAccount = accountsQuery.data?.find(acc => acc.sfid === e.target.value);
-                if (selectedAccount) {
-                    setEditingRow(prev => ({
-                        ...prev,
-                        specificSalesforceId: selectedAccount.sfid,
-                        specificAccountName: selectedAccount.name,
-                    }));
-                }
-            }}
-            className="bg-slate-700 rounded p-1 w-full"
-        >
-            {accountsQuery.data?.map(acc => (
-                <option key={acc.sfid} value={acc.sfid}>{acc.name}</option>
-            ))}
-        </select>
-    );
+  if (accountsQuery.isLoading) return <FaSpinner className="animate-spin" />;
+
+  return (
+    <select
+      value={editingRow.specificSalesforceId || ''}
+      onChange={(e) => {
+        const selectedAccount = accountsQuery.data?.find(acc => acc.sfid === e.target.value);
+        if (selectedAccount) {
+          setEditingRow(prev => ({
+            ...prev,
+            specificSalesforceId: selectedAccount.sfid,
+            specificAccountName: selectedAccount.name,
+          }));
+        }
+      }}
+      className="bg-slate-700 rounded p-1 w-full"
+    >
+      <option value="">Select account</option>
+      {accountsQuery.data?.map(acc => (
+        <option key={acc.sfid} value={acc.sfid}>{acc.name}</option>
+      ))}
+    </select>
+  );
 };
 
 
@@ -95,16 +101,15 @@ export const ReportPane = ({ program, period, onClose }) => {
 
   const columns = [
     columnHelper.accessor('discrepancy.bac', { header: 'BAC' }),
-    columnHelper.accessor('specificAccountName', { 
-        header: 'Account Name',
-        cell: ({ row }) => (
-            <EditableAccountCell 
-                row={row} 
-                editingRow={editingRow}
-                setEditingRow={setEditingRow}
-                onSave={handleSave}
-            />
-        )
+    columnHelper.accessor('specificAccountName', {
+      header: 'Account Name',
+      cell: ({ row }) => (
+        <EditableAccountCell
+          row={row}
+          editingRow={editingRow}
+          setEditingRow={setEditingRow}
+        />
+      ),
     }),
     columnHelper.accessor('discrepancy.variance', {
       header: 'Variance',
@@ -155,10 +160,10 @@ export const ReportPane = ({ program, period, onClose }) => {
             </>
           ) : (
             <>
-              <button onClick={() => handleEdit(row)} className="text-slate-400 hover:text-white">
+              <button onClick={() => handleEdit(row)} className="text-blue-500 hover:text-blue-400">
                 <FaEdit />
               </button>
-              <button onClick={() => deleteEntryMutation.mutate(row.original.id)} className="text-slate-400 hover:text-rose-500">
+              <button onClick={() => deleteEntryMutation.mutate(row.original.id)} className="text-red-500 hover:text-red-400">
                 <FaTrash />
               </button>
             </>
