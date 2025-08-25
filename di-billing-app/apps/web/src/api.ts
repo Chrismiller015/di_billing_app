@@ -11,16 +11,25 @@ export async function fetchDashboardStats() {
 
 // =========== Discrepancy Functions ===========
 
-// This function is simplified as filters are removed for now.
-export async function fetchDiscrepancies(query: { page?: number; pageSize?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; }) {
+// Fetch discrepancies with optional BAC and program filters.
+export async function fetchDiscrepancies(query: {
+  page?: number;
+  pageSize?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  bac?: string;
+  program?: string;
+}) {
   const params = new URLSearchParams({
     page: String(query.page || 1),
     pageSize: String(query.pageSize || 50),
     sortBy: query.sortBy || 'variance',
-    sortOrder: query.sortOrder || 'desc'
+    sortOrder: query.sortOrder || 'desc',
   });
+  if (query.bac) params.set('bac', query.bac);
+  if (query.program) params.set('program', query.program);
   const res = await fetch(`${API_URL}/discrepancies?${params.toString()}`);
-  if (!res.ok) throw new Error("Failed to fetch discrepancies");
+  if (!res.ok) throw new Error('Failed to fetch discrepancies');
   return res.json();
 }
 
@@ -34,10 +43,11 @@ export async function recalculateDiscrepancies(program: string, period: string) 
   return res.json();
 }
 
-// This endpoint is corrected to match the backend controller.
+// Fetch accounts for a BAC using the correct backend route.
 export async function fetchAccountsByBac(bac: string) {
-  const res = await fetch(`${API_URL}/discrepancies/accounts/${bac}`);
-  if (!res.ok) throw new Error("Failed to fetch accounts for BAC");
+  const params = new URLSearchParams({ bac });
+  const res = await fetch(`${API_URL}/discrepancies/accounts-by-bac?${params.toString()}`);
+  if (!res.ok) throw new Error('Failed to fetch accounts for BAC');
   return res.json();
 }
 
