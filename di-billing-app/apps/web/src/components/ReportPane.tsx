@@ -23,7 +23,7 @@ const EditableAccountCell = ({ row, editingRow, setEditingRow }) => {
   const accountsQuery = useQuery({
     queryKey: ['accountsByBac', bac],
     queryFn: () => fetchAccountsByBac(bac),
-    enabled: isMulti && editingRow?.id === original.id,
+    enabled: isMulti,
   });
 
   if (!isMulti) {
@@ -159,7 +159,6 @@ export const ReportPane = ({ program, period, onClose }) => {
             </>
           ) : (
             <>
-              {/* Keep Codex behavior: always show Edit */}
               <button onClick={() => handleEdit(row)} className="text-blue-500 hover:text-blue-400">
                 <FaEdit />
               </button>

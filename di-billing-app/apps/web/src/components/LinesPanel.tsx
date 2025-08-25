@@ -49,6 +49,11 @@ export const LinesPanel = ({ title, lines, type }: { title: string; lines: Line[
     return sortConfig.direction === 'asc' ? <FaSortUp /> : <FaSortDown />;
   };
 
+  const total = useMemo(
+    () => lines.reduce((sum, l) => sum + l.unitPrice * l.qty, 0),
+    [lines]
+  );
+
   return (
     <div className="border border-slate-800 rounded-xl overflow-hidden">
       <div className="px-3 py-2 bg-slate-900/60 border-b border-slate-800">
@@ -101,6 +106,13 @@ export const LinesPanel = ({ title, lines, type }: { title: string; lines: Line[
             ))
           )}
         </tbody>
+        <tfoot>
+          <tr className="border-t border-slate-800 font-semibold bg-slate-900/40">
+            {type === 'sf' && <td />}
+            <td className="px-3 py-2 text-right">Total</td>
+            <td className="px-3 py-2 text-right">{total.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+          </tr>
+        </tfoot>
       </table>
     </div>
   );
