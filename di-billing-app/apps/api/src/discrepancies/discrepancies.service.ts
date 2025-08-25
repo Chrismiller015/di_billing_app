@@ -89,38 +89,30 @@ export class DiscrepanciesService {
   async recalculate(program: string, period: string) {
     this.logger.log(`Recalculating discrepancies for Program: "${program}", Period: "${period}"`);
     
-    const sfAgg = await this.db.subscription.groupBy({
-      by: ["accountId"],
+    const subscriptions = await this.db.subscription.findMany({
       where: { program: program as Program, isLive: true },
-      _sum: { unitPrice: true },
+      select: {
+        unitPrice: true,
+        qty: true,
+        account: { select: { bac: true, name: true, sfid: true, isPrimary: true } },
+      },
     });
-    
-    const accountIds = sfAgg.map((a) => a.accountId);
-    const accounts = await this.db.account.findMany({
-      where: { id: { in: accountIds } },
-      select: { id: true, sfid: true, bac: true, name: true, isPrimary: true },
-    });
-    
-    const bacToAccounts = new Map<string, {sfid: string, name: string, isPrimary: boolean}[]>();
-    for (const acc of accounts) {
-        if (!bacToAccounts.has(acc.bac)) {
-            bacToAccounts.set(acc.bac, []);
-        }
-        bacToAccounts.get(acc.bac)!.push({ sfid: acc.sfid, name: acc.name, isPrimary: acc.isPrimary });
-    }
 
-    const sfByBac = new Map<string, { total: number; accounts: {sfid: string, name: string, isPrimary: boolean}[] }>();
-    for (const a of sfAgg) {
-      const acc = accounts.find((x) => x.id === a.accountId);
-      if (!acc) continue;
-      
-      const accs = bacToAccounts.get(acc.bac) || [];
-      
-      const current = sfByBac.get(acc.bac) || { total: 0, accounts: accs };
-      sfByBac.set(acc.bac, {
-        total: current.total + (a._sum.unitPrice || 0),
-        accounts: accs,
-      });
+    const sfByBac = new Map<string, { total: number; accounts: { sfid: string; name: string; isPrimary: boolean }[] }>();
+    for (const sub of subscriptions) {
+      const total = sub.unitPrice * sub.qty;
+      const bac = sub.account.bac;
+      const accInfo = {
+        sfid: sub.account.sfid,
+        name: sub.account.name,
+        isPrimary: sub.account.isPrimary,
+      };
+      const current = sfByBac.get(bac) || { total: 0, accounts: [] };
+      current.total += total;
+      if (!current.accounts.find(a => a.sfid === accInfo.sfid)) {
+        current.accounts.push(accInfo);
+      }
+      sfByBac.set(bac, current);
     }
 
     const invoice = await this.db.gMInvoice.findFirst({

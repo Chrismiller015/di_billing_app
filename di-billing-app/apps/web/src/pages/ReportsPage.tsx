@@ -65,7 +65,7 @@ export const ReportsPage = () => {
                                         <button onClick={() => handleDownload(report.id, report.name)} className="text-slate-400 hover:text-white">
                                             <FaDownload />
                                         </button>
-                                        <button onClick={() => deleteMutation.mutate(report.id)} disabled={deleteMutation.isPending} className="text-slate-400 hover:text-rose-500 disabled:opacity-50">
+                                        <button onClick={() => deleteMutation.mutate(report.id)} disabled={deleteMutation.isPending} className="text-red-500 hover:text-red-400 disabled:opacity-50">
                                             {deleteMutation.isPending && deleteMutation.variables === report.id ? <FaSpinner className="animate-spin" /> : <FaTrash />}
                                         </button>
                                     </div>

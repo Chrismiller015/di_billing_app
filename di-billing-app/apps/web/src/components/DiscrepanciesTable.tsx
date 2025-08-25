@@ -53,8 +53,10 @@ export const DiscrepanciesTable = ({ data = [], onRowSelect, selectedIds }) => {
   };
 
   const handleRowClick = (row: any) => {
-    // This is feature #1: Clicking a row navigates to the (future) details page.
-    navigate(`/discrepancies/${row.original.id}`);
+    const id = row.original.id;
+    if (id) {
+      navigate(`/discrepancies/${id}`);
+    }
   };
   
   return (
